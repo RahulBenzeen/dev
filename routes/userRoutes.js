@@ -4,8 +4,9 @@ const {
   loginUser,
   getProfile,
   updateProfile,
+  
 } = require('../controllers/userController');
-const { protect } = require('../middlewares/authMiddleware');
+const { protect , verifyToken} = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.post('/login', loginUser);
 
 // Private routes
 router.get('/profile', protect, getProfile);
+router.get('/verify', verifyToken, getProfile);
 router.put('/profile', protect, updateProfile);
 
 module.exports = router;

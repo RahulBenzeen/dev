@@ -5,6 +5,7 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  getRecentlyViewedProducts
 } = require('../controllers/productController');
 
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
@@ -12,12 +13,13 @@ const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const router = express.Router();
 
 // Public routes
-router.get('/', getProducts);
+router.get('/all', getProducts);
 router.get('/:id', getProductById);
 
 // Admin routes
-router.post('/', protect, adminOnly, createProduct);
+router.post('/add', protect, adminOnly, createProduct);
 router.put('/:id', protect, adminOnly, updateProduct);
+router.get('/recently-viewed', protect, getRecentlyViewedProducts); // Add this route
 router.delete('/:id', protect, adminOnly, deleteProduct);
 
 module.exports = router;

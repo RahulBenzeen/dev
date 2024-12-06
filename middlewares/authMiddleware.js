@@ -23,4 +23,17 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly };
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]; // Extract token from Bearer
+  if (!token) return next(new CustomError('No token provided', 401));
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token with secret
+    req.user = decoded; // Attach user data to request
+    next();
+  } catch (err) {
+    return next(new CustomError('Invalid or expired token', 401));
+  }
+};
+
+module.exports = { protect, adminOnly, verifyToken};

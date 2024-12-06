@@ -7,11 +7,11 @@ const { CustomError } = require('../middlewares/errorHandler');
 // @access  Private
 const addItemToCart = async (req, res, next) => {
   try {
-    const { productId, quantity } = req.body;
+    const { _id, quantity } = req.body;
     const userId = req.user.id;
 
     // Check if product exists
-    const product = await Product.findById(productId);
+    const product = await Product.findById(_id);
     if (!product) throw new CustomError('Product not found', 404);
 
     // Find user's cart
@@ -19,18 +19,18 @@ const addItemToCart = async (req, res, next) => {
     if (!cart) {
       cart = new Cart({
         user: userId,
-        items: [{ product: productId, quantity, price: product.price }],
+        items: [{ product: _id, quantity, price: product.price }],
       });
     } else {
       // Check if product is already in the cart
       const existingItemIndex = cart.items.findIndex(
-        (item) => item.product.toString() === productId.toString()
+        (item) => item.product.toString() === _id.toString()
       );
       if (existingItemIndex >= 0) {
         // Update quantity if product already in cart
         cart.items[existingItemIndex].quantity += quantity;
       } else {
-        cart.items.push({ product: productId, quantity, price: product.price });
+        cart.items.push({ product: _id, quantity, price: product.price });
       }
     }
 
@@ -52,6 +52,7 @@ const addItemToCart = async (req, res, next) => {
 const getCart = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user.id }).populate('items.product');
+    console.log({ user: req.user.id })
     if (!cart) {
       return res.status(404).json({
         success: false,
