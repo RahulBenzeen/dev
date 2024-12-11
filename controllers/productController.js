@@ -6,19 +6,82 @@ const { CustomError } = require('../middlewares/errorHandler');
 // @access  Public
 const getProducts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
+    const page = Number(req.query.page) > 0 ? parseInt(req.query.page, 10) : 1;
+    const limit = Number(req.query.limit) > 0 ? parseInt(req.query.limit, 10) : 10;
     const startIndex = (page - 1) * limit;
 
-    const total = await Product.countDocuments();
+    // Get the optional filters from query parameters
+    const { category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy } = req.query;
 
-    const products = await Product.find()
+    // Build the query object dynamically
+    const query = {};
+    
+    if (category) {g
+      query.category = { $reex: new RegExp(category, 'i') };  // Case-insensitive regex for category
+    }
+
+    if (subcategory) {
+      query.subcategory = { $regex: new RegExp(subcategory, 'i') };  // Case-insensitive regex for subcategory
+    }
+
+    if (brand) query.brand = brand;
+
+    // Add price range filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+
+    // Add rating filter
+    if (rating && rating !== '0') {
+      query.rating = { $gte: parseFloat(rating) };
+    }
+
+    // Add free text search
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } },
+        { subcategory: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Count documents matching the query
+    const total = await Product.countDocuments(query);
+
+    // Prepare the sort object
+    let sort = {};
+    if (sortBy) {
+      switch (sortBy) {
+        case 'price_asc':
+          sort = { price: 1 };
+          break;
+        case 'price_desc':
+          sort = { price: -1 };
+          break;
+        case 'rating_desc':
+          sort = { rating: -1 };
+          break;
+        case 'newest':
+          sort = { createdAt: -1 };
+          break;
+        default:
+          sort = { _id: 1 }; // Default sort
+      }
+    }
+
+    // Fetch products matching the query with pagination and sorting
+    const products = await Product.find(query)
+      .sort(sort)
       .skip(startIndex)
       .limit(limit);
 
     res.status(200).json({
       success: true,
-      totalItems: products.length,
+      totalItems: total,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
@@ -27,6 +90,7 @@ const getProducts = async (req, res, next) => {
       data: products,
     });
   } catch (error) {
+    console.error("Error fetching products:", error);
     next(error);
   }
 };

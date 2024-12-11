@@ -13,30 +13,60 @@ const getOrders = async (req, res, next) => {
   }
 };
 
-
 const createOrder = async (req, res, next) => {
   try {
-    const { products, shippingAddress } = req.body;
-    const userId = req.user.id; // Get the logged-in user's ID
+    const { products, shippingAddress, paymentMethod } = req.body;
+    const userId = req.user.id;
 
-    // Calculate the total price (could be done on the frontend as well)
-    let totalPrice = 0;
-    products.forEach(product => {
-      totalPrice += product.quantity * product.price;
+    // Validate required fields
+    if (!products || products.length === 0) {
+      throw new CustomError("No products provided for the order", 400);
+    }
+    if (!shippingAddress) {
+      throw new CustomError("Shipping address is required", 400);
+    }
+    if (!paymentMethod) {
+      throw new CustomError("Payment method is required", 400);
+    }
+
+    // Validate product structure
+    products.forEach((product, index) => {
+      if (!product.product) {
+        throw new CustomError(`Product at index ${index} is missing a reference to the product schema`, 400);
+      }
+      if (!product.quantity || product.quantity <= 0) {
+        throw new CustomError(`Product at index ${index} has an invalid quantity`, 400);
+      }
+      if (!product.price || product.price <= 0) {
+        throw new CustomError(`Product at index ${index} has an invalid price`, 400);
+      }
     });
 
-    // Create the new order
+    // Calculate total price
+    const totalPrice = products.reduce((sum, product) => sum + product.quantity * product.price, 0);
+
+    // Normalize shipping address
+    const normalizedAddress = {
+      name: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
+      city: shippingAddress.city,
+      country: shippingAddress.country,
+      postalCode: shippingAddress.zipCode,
+    };
+
+    // Save the order
     const order = await Order.create({
       user: userId,
-      products: products,
-      totalPrice: totalPrice,
-      shippingAddress: shippingAddress,
+      products,
+      totalPrice,
+      shippingAddress: normalizedAddress,
+      paymentMethod,
     });
 
     res.status(201).json({
       success: true,
-      orderId: order._id, // Return the created order ID
-      order: order, // Optionally return the entire order object
+      message: "Order created successfully",
+      orderId: order._id,
+      order,
     });
   } catch (error) {
     next(error);
@@ -80,6 +110,30 @@ const updateOrderStatus = async (req, res, next) => {
   }
 };
 
+
+// @desc    Get all orders for a specific user
+// @route   GET /api/orders/user/:userId
+// @access  Private
+const getOrdersByUser = async (req, res, next) => {
+  console.log('request  user is here ===> ', req.user.id)
+  try {
+
+    // Find orders for the specified user
+    const orders = await Order.find({ user: req.user.id })
+      .populate('products.product', 'name price')
+      .populate('user', 'name email');
+
+    // Check if orders exist for the user
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ success: false, message: 'No orders found for this user' });
+    }
+
+    res.status(200).json({ success: true, orders });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Delete an order
 // @route   DELETE /api/admin/orders/:id
 // @access  Private, Admin
@@ -100,5 +154,6 @@ module.exports = {
   getOrderById,
   updateOrderStatus,
   deleteOrder,
-  createOrder
+  createOrder,
+  getOrdersByUser
 };

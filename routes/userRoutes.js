@@ -4,6 +4,7 @@ const {
   loginUser,
   getProfile,
   updateProfile,
+  validateAndSaveAddress
   
 } = require('../controllers/userController');
 const { protect , verifyToken} = require('../middlewares/authMiddleware');

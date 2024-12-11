@@ -46,10 +46,7 @@ const CartSchema = new mongoose.Schema(
 
 // Pre-save hook to calculate the total price
 CartSchema.pre('save', function (next) {
-  this.total = this.items.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
+  this.total = this.items.reduce((acc, item) => acc + item.price * item.quantity, 0);
   next();
 });
 

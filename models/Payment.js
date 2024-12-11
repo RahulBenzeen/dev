@@ -19,7 +19,7 @@ const PaymentSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['credit_card', 'paypal', 'stripe'],
+      enum: ['credit_card', 'paypal', 'stripe', 'razorpay'], // Added 'razorpay' here
       required: true,
     },
     amount: {
@@ -35,7 +35,7 @@ const PaymentSchema = new mongoose.Schema(
       required: true,
     },
     paymentResponse: {
-      type: Object, // Store response from payment gateway (e.g., Stripe)
+      type: Object, // Store response from payment gateway (e.g., Razorpay)
       required: true,
     },
   },

@@ -12,10 +12,11 @@ const ProductSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    // ref: 'Category',  // Reference to Category model (if needed)
     required: [true, 'Product category is required'],
-
-
+  },
+  subcategory: {
+    type: String,
+    required: [true, 'Product subcategory is required'],
   },
   brand: {
     type: String,
@@ -30,12 +31,6 @@ const ProductSchema = new mongoose.Schema({
   images: {
     type: [String],
     required: [true, 'Product images are required'],
-    // validate: {
-    //   validator: function (v) {
-    //     return v.every(url => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(url));
-    //   },
-    //   message: 'Invalid URL format for images',
-    // },
   },
   rating: {
     type: Number,
@@ -48,6 +43,27 @@ const ProductSchema = new mongoose.Schema({
     required: [true, 'Product stock is required'],
     min: [0, 'Stock cannot be negative'],
   },
+  sku: {
+    type: String,
+    required: [true, 'Product SKU is required'],
+    unique: true,
+    trim: true,
+  },
+  weight: {
+    type: Number,
+    required: [true, 'Product weight is required'],
+    min: [0, 'Weight must be a positive number'],
+  },
+  dimensions: {
+    type: String,
+    required: [true, 'Product dimensions are required'],
+    validate: {
+      validator: function(v) {
+        return /^\d+(\.\d+)?\s*[x*]\s*\d+(\.\d+)?\s*[x*]\s*\d+(\.\d+)?$/.test(v);
+      },
+      message: props => `${props.value} is not a valid dimension format! Use "L x W x H" or "L * W * H" (e.g., "10 x 5 x 2" or "10 * 5 * 2").`
+    }
+  },  
   createdAt: {
     type: Date,
     default: Date.now,

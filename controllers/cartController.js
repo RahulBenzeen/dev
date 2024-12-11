@@ -9,14 +9,21 @@ const addItemToCart = async (req, res, next) => {
   try {
     const { _id, quantity } = req.body;
     const userId = req.user.id;
+    console.log({quantity})
 
     // Check if product exists
     const product = await Product.findById(_id);
     if (!product) throw new CustomError('Product not found', 404);
 
+    // Check if there is enough stock for the requested quantity
+    if (product.stock < quantity) {
+      throw new CustomError('Not enough stock available', 400); // You can customize the error message
+    }
+
     // Find user's cart
     let cart = await Cart.findOne({ user: userId });
     if (!cart) {
+      // If no cart exists, create a new cart
       cart = new Cart({
         user: userId,
         items: [{ product: _id, quantity, price: product.price }],
@@ -27,9 +34,15 @@ const addItemToCart = async (req, res, next) => {
         (item) => item.product.toString() === _id.toString()
       );
       if (existingItemIndex >= 0) {
+        // Check if the updated quantity exceeds available stock
+        const newQuantity = cart.items[existingItemIndex].quantity + quantity;
+        if (product.stock < newQuantity) {
+          throw new CustomError('Not enough stock available', 400); // You can customize the error message
+        }
         // Update quantity if product already in cart
-        cart.items[existingItemIndex].quantity += quantity;
+        cart.items[existingItemIndex].quantity = newQuantity;
       } else {
+        // Add the new item to the cart
         cart.items.push({ product: _id, quantity, price: product.price });
       }
     }
@@ -45,6 +58,7 @@ const addItemToCart = async (req, res, next) => {
     next(error);
   }
 };
+;
 
 // @desc    Get the current cart
 // @route   GET /api/cart
@@ -77,14 +91,27 @@ const updateCartItemQuantity = async (req, res, next) => {
     const { itemId } = req.params;
     const { quantity } = req.body;
 
+    // Find the user's cart
     const cart = await Cart.findOne({ user: req.user.id });
     if (!cart) throw new CustomError('Cart not found', 404);
 
+    // Find the item in the cart
     const itemIndex = cart.items.findIndex((item) => item._id.toString() === itemId);
     if (itemIndex === -1) throw new CustomError('Item not found in cart', 404);
 
+    // Get the product associated with the cart item
+    const product = await Product.findById(cart.items[itemIndex].product);
+    if (!product) throw new CustomError('Product not found', 404);
+
+    // Check if there is enough stock for the requested quantity
+    if (product.stock < quantity) {
+      throw new CustomError('Not enough stock available', 400);
+    }
+
+    // Update the item's quantity
     cart.items[itemIndex].quantity = quantity;
 
+    // Save the updated cart
     await cart.save();
 
     res.status(200).json({

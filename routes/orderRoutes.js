@@ -4,7 +4,8 @@ const {
   getOrderById,
   updateOrderStatus,
   deleteOrder,
-  createOrder
+  createOrder,
+  getOrdersByUser
   
 } = require('../controllers/orderController');
 const { protect,adminOnly } = require('../middlewares/authMiddleware');
@@ -18,5 +19,6 @@ router.get('/orders/:id', protect, adminOnly, getOrderById);         // Get sing
 router.put('/orders/:id', protect, adminOnly, updateOrderStatus);    // Update order status
 router.delete('/orders/:id', protect, adminOnly, deleteOrder);       // Delete order
 router.post('/create', protect, createOrder);       // create order
+router.get('/myorder', protect, getOrdersByUser);       // create order
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Address = require('../models/Address');
 const jwt = require('jsonwebtoken');
 const { CustomError } = require('../middlewares/errorHandler');
 
@@ -19,6 +20,12 @@ const registerUser = async (req, res, next) => {
     if (userExists) throw new CustomError('User already exists', 400);
 
     const user = await User.create({ name, email, password });
+
+    req.session.user = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    }
 
     res.status(201).json({
       success: true,
@@ -47,12 +54,21 @@ const loginUser = async (req, res, next) => {
       throw new CustomError('Invalid email or password', 401);
     }
 
+    req.session.user = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    }
+
+    console.log('User set in session:', req.session.user);
+ 
     res.status(200).json({
       success: true,
       data: {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
         token: generateToken(user._id, user.role),
       },
     });
@@ -107,5 +123,8 @@ const updateProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+
+  
 
 module.exports = { registerUser, loginUser, getProfile, updateProfile };
