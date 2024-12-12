@@ -5,16 +5,18 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
-  getRecentlyViewedProducts
+  getRecentlyViewedProducts,
+  getSimilarProducts
 } = require('../controllers/productController');
 
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
-const router = express.Router();
 
+const router = express.Router();
 // Public routes
 router.get('/all', getProducts);
 router.get('/:id', getProductById);
+router.get('/similar-products/:id', getSimilarProducts);
 
 // Admin routes
 router.post('/add', protect, adminOnly, createProduct);

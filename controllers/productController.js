@@ -16,8 +16,8 @@ const getProducts = async (req, res, next) => {
     // Build the query object dynamically
     const query = {};
     
-    if (category) {g
-      query.category = { $reex: new RegExp(category, 'i') };  // Case-insensitive regex for category
+    if (category) {
+      query.category = { $regex: new RegExp(category, 'i') };  // Case-insensitive regex for category
     }
 
     if (subcategory) {
@@ -46,6 +46,7 @@ const getProducts = async (req, res, next) => {
         { brand: { $regex: search, $options: 'i' } },
         { category: { $regex: search, $options: 'i' } },
         { subcategory: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },  // Add SKU search
       ];
     }
 
@@ -131,11 +132,30 @@ const getProductById = async (req, res, next) => {
 // @access  Admin
 const createProduct = async (req, res, next) => {
   try {
-    const product = await Product.create(req.body);
+    const { category, subcategory, brand } = req.body;
+
+    // Create SKU based on category, subcategory, brand, and a timestamp or random number
+    const sku = generateSku(category, subcategory, brand);
+
+    // Create the product with the generated SKU
+    const product = await Product.create({ ...req.body, sku });
+    
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     next(error);
   }
+};
+
+const generateSku = (category, subcategory, brand) => {
+  // Format: [Category][Subcategory][Brand Initials][Timestamp/UniqueNumber]
+  const categoryCode = category.slice(0, 3).toUpperCase();  // First 3 letters of the category
+  const subcategoryCode = subcategory.slice(0, 3).toUpperCase();  // First 3 letters of the subcategory
+  const brandCode = brand.slice(0, 2).toUpperCase();  // First 2 letters of the brand
+  
+  // Generate a unique identifier, e.g., timestamp or random number
+  const uniqueId = Date.now();  // Use timestamp for uniqueness
+  
+  return `${categoryCode}-${subcategoryCode}-${brandCode}-${uniqueId}`;
 };
 
 // @desc    Update a product by ID
@@ -172,7 +192,7 @@ const deleteProduct = async (req, res, next) => {
 const ObjectId = require('mongoose').Types.ObjectId;
 
 const getRecentlyViewedProducts = async (req, res, next) => {
-  console.log("hello world!")
+
   try {
     // Log raw session data for debugging
     console.log('Raw session data:', req.session.recentlyViewed);
@@ -204,5 +224,39 @@ const getRecentlyViewedProducts = async (req, res, next) => {
   }
 };
 
+const getSimilarProducts = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!id || !ObjectId.isValid(id)) {
+      throw new CustomError('Invalid product ID', 400);
+    }
 
-module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, getRecentlyViewedProducts};
+    const currentProduct = await Product.findById(id);
+    if (!currentProduct) {
+      throw new CustomError('Product not found', 404);
+    }
+
+    const similarProducts = await Product.find({
+      category: currentProduct.category,
+      _id: { $ne: currentProduct._id },
+    })
+      .limit(10)
+      .select('name images price rating stock');
+
+    res.status(200).json({ success: true, data: similarProducts });
+  } catch (error) {
+    console.error('Error fetching similar products:', error);
+    next(error);
+  }
+};
+
+
+module.exports = { 
+  getProducts, 
+  getProductById, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct, 
+  getRecentlyViewedProducts, 
+  getSimilarProducts
+};
