@@ -75,7 +75,7 @@ const limiter = rateLimit({
 });
 
 // Apply rate limiter
-app.use(limiter);
+// app.use(limiter);
 
 // Routes
 app.use('/api/products', productRoutes);

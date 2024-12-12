@@ -1,6 +1,6 @@
 const Product = require('../models/Product');
 const { CustomError } = require('../middlewares/errorHandler');
-
+const redisClient =  require('../utils/redis/redisConnection')
 // @desc    Get all products
 // @route   GET /api/products
 // @access  Public
@@ -12,6 +12,15 @@ const getProducts = async (req, res, next) => {
 
     // Get the optional filters from query parameters
     const { category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy } = req.query;
+
+    // create a unique key based on query parameters for cahing 
+    const cacheKey = `products:${JSON.stringify({ page, limit, category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy })}`;
+
+     const cachedData = await redisClient.get(cacheKey);
+
+     if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
 
     // Build the query object dynamically
     const query = {};
@@ -80,16 +89,16 @@ const getProducts = async (req, res, next) => {
       .skip(startIndex)
       .limit(limit);
 
-    res.status(200).json({
-      success: true,
-      totalItems: total,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
+
+      const response = {
+        success: true,
         totalItems: total,
-      },
-      data: products,
-    });
+        pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total },
+        data: products,
+      };
+
+      await redisClient.setEx(cacheKey, 600, JSON.stringify(response));
+      res.status(200).json(response);
   } catch (error) {
     console.error("Error fetching products:", error);
     next(error);
@@ -104,21 +113,20 @@ const getProducts = async (req, res, next) => {
 const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
+    // Check cache
+    const cacheKey = `product:${id}`;
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
     const product = await Product.findById(id);
     if (!product) throw new CustomError('Product not found', 404);
 
-    // Session logic remains unchanged
-    if (!req.session.recentlyViewed) {
-      req.session.recentlyViewed = [];
-    }
-
-    req.session.recentlyViewed = [
-      product._id.toString(),
-      ...req.session.recentlyViewed.filter((pid) => pid !== product._id.toString()),
-    ].slice(0, 5);
-
-    console.log(req.session)
+    // Cache the product data
+    await redisClient.setEx(cacheKey, 600, JSON.stringify({ success: true, data: product }));
 
     res.status(200).json({ success: true, data: product });
   } catch (error) {
@@ -133,18 +141,18 @@ const getProductById = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   try {
     const { category, subcategory, brand } = req.body;
-
-    // Create SKU based on category, subcategory, brand, and a timestamp or random number
     const sku = generateSku(category, subcategory, brand);
-
-    // Create the product with the generated SKU
     const product = await Product.create({ ...req.body, sku });
-    
+
+    // Clear all product-related cache (optional)
+    await redisClient.flushAll();
+
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     next(error);
   }
 };
+
 
 const generateSku = (category, subcategory, brand) => {
   // Format: [Category][Subcategory][Brand Initials][Timestamp/UniqueNumber]
