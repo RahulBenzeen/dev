@@ -23,6 +23,10 @@ const UserSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    profilePicture: {
+      type: String,
+      default: null, // No default value or use a placeholder URL if desired
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],
@@ -32,6 +36,8 @@ const UserSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    resetPasswordToken: String, // Store reset token for password reset
+    resetPasswordExpires: Date, // Store the expiration time for the reset token
   },
   { timestamps: true }
 );

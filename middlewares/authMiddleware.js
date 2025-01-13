@@ -17,6 +17,7 @@ const protect = (req, res, next) => {
 
 // Middleware to restrict access to admin only
 const adminOnly = (req, res, next) => {
+  console.log({role:req.user.role})
   if (req.user?.role !== 'admin') {
     return next(new CustomError('Access denied, admin only', 403));
   }

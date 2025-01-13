@@ -1,5 +1,5 @@
 const express = require('express');
-// const dotenv = require('dotenv');
+const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -13,10 +13,11 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const addressRoutes = require('./routes/addressRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 const session = require('express-session');
 const { errorHandler } = require('./middlewares/errorHandler');
 
-// dotenv.config();
+dotenv.config();
 connectDB();
 
 const app = express();
@@ -47,10 +48,10 @@ app.use(
 );
 
 // Debugging middleware (remove in production)
-app.use((req, res, next) => {
-  console.log("Session Data:", req.session);
-  next();
-});
+// app.use((req, res, next) => {
+//   console.log("Session Data:", req.session);
+//   next();
+// });
 
 app.get('/api/test-session', (req, res) => {
   if (req.session.user) {
@@ -86,6 +87,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/address', addressRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Error Handler
 app.use(errorHandler);

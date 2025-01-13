@@ -86,14 +86,49 @@ const deleteProduct = async (req, res, next) => {
 // @desc    Get all users
 // @route   GET /api/admin/users
 // @access  Private, Admin
+// const getUsers = async (req, res, next) => {
+//   try {
+//     const users = await User.find();
+//     res.status(200).json({ success: true, users });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const getUsers = async (req, res, next) => {
   try {
-    const users = await User.find();
+    // Use aggregation to count the number of orders for each user
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: 'orders', // This should match the name of the Order collection
+          localField: '_id', // Field in the User collection (_id)
+          foreignField: 'user', // Field in the Order collection that references User (_id)
+          as: 'orders', // Alias to store matching orders for each user
+        }
+      },
+      {
+        $addFields: {
+          numberOfOrders: { $size: '$orders' } // Add the number of orders to the user object
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          role:1,
+          numberOfOrders: 1, // Include the numberOfOrders field
+          // Add any other fields from User you want to include
+        }
+      }
+    ]);
+
     res.status(200).json({ success: true, users });
   } catch (error) {
     next(error);
   }
 };
+
 
 // @desc    Get all orders
 // @route   GET /api/admin/orders

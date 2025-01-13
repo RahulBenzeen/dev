@@ -5,10 +5,14 @@ const addNewAddress = async (req, res, next) => {
   const addressData = req.body;
 
   try {
+    // Ensure the user ID is available (e.g., from req.user if using JWT authentication)
+    const userId = req.user.id;  // Make sure this comes from your authentication middleware
+    // A`dd the user ID to the address data before creating the new address
+    const newAddressData = { ...addressData, user: userId };
+
     // Validate the address using the Mongoose schema
-    const address = new Address(addressData);
+    const address = new Address(newAddressData);
     const validationError = address.validateSync();
-    // await Address.deleteMany({})
 
     // If there are validation errors, return them with status 400 (Bad Request)
     if (validationError) {
@@ -28,17 +32,21 @@ const addNewAddress = async (req, res, next) => {
 
 // Fetch all addresses
 const getAllAddresses = async (req, res, next) => {
-    try {
-      // Fetch only the top 5 addresses
-      const addresses = await Address.find().limit(5);
-  
-      // Return the list of addresses
-      return res.status(200).json({ success: true, addresses });
-    } catch (error) {
-      // Handle unexpected errors
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  };
+  try {
+    // Assuming the user is authenticated and their user ID is available via req.user._id
+    const userId = req.user.id;  // This might come from a JWT token or session
+
+    // Fetch only the top 5 addresses for the logged-in user
+    const addresses = await Address.find({ user: userId }).limit(5);  // Assuming 'user' is the reference field in the Address schema
+
+    // Return the list of addresses
+    return res.status(200).json({ success: true, addresses });
+  } catch (error) {
+    // Handle unexpected errors
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
   
 // Update an address by ID
 const updateAddress = async (req, res, next) => {

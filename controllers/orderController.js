@@ -79,26 +79,32 @@ const createOrder = async (req, res, next) => {
 const getOrderById = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('user', 'name email')
-      .populate('products.product', 'name price');
+      .populate('user', 'name email') // Populate user details
+      .populate('products.product', 'name price images'); // Populate name, price, and images from Product
+
+      console.log(order)
+
     if (!order) {
       throw new CustomError('Order not found', 404);
     }
+
     res.status(200).json({ success: true, order });
   } catch (error) {
     next(error);
   }
 };
 
+
 // @desc    Update order status
 // @route   PUT /api/admin/orders/:id
 // @access  Private, Admin
 const updateOrderStatus = async (req, res, next) => {
-  const { orderStatus, paymentStatus } = req.body;
+  const { orderStatus } = req.body;
+  console.log('orderStatus is here ===> ', orderStatus)
   try {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
-      { orderStatus, paymentStatus },
+      { orderStatus },
       { new: true }
     );
     if (!order) {
@@ -115,13 +121,21 @@ const updateOrderStatus = async (req, res, next) => {
 // @route   GET /api/orders/user/:userId
 // @access  Private
 const getOrdersByUser = async (req, res, next) => {
-  console.log('request  user is here ===> ', req.user.id)
   try {
+    console.log('Requesting orders for user:', req.user.id);
 
     // Find orders for the specified user
     const orders = await Order.find({ user: req.user.id })
-      .populate('products.product', 'name price')
-      .populate('user', 'name email');
+      .populate({
+        path: 'products.product',
+        select: 'name price images', // Populate product fields
+      })
+      .populate('user', 'name email'); // Populate user fields
+
+    // Filter out null products if any exist
+    orders.forEach((order) => {
+      order.products = order.products.filter((p) => p.product !== null);
+    });
 
     // Check if orders exist for the user
     if (!orders || orders.length === 0) {
@@ -133,6 +147,7 @@ const getOrdersByUser = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // @desc    Delete an order
 // @route   DELETE /api/admin/orders/:id

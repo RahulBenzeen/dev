@@ -58,12 +58,38 @@ const ProductSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Product dimensions are required'],
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         return /^\d+(\.\d+)?\s*[x*]\s*\d+(\.\d+)?\s*[x*]\s*\d+(\.\d+)?$/.test(v);
       },
-      message: props => `${props.value} is not a valid dimension format! Use "L x W x H" or "L * W * H" (e.g., "10 x 5 x 2" or "10 * 5 * 2").`
-    }
-  },  
+      message: (props) =>
+        `${props.value} is not a valid dimension format! Use "L x W x H" or "L * W * H" (e.g., "10 x 5 x 2" or "10 * 5 * 2").`,
+    },
+  },
+  isSpecialOffer: {
+    type: Boolean,
+    default: false, // Defaults to `false` if not provided
+  },
+  discountPercentage: {
+    type: Number,
+    min: [0, 'Discount percentage cannot be negative'],
+    max: [100, 'Discount percentage cannot exceed 100'],
+    validate: {
+      validator: function (v) {
+        // Ensure discountPercentage is only set when isSpecialOffer is true
+        return !this.isSpecialOffer || (v >= 0 && v <= 100);
+      },
+      message: 'Discount percentage must be between 0 and 100 if provided.',
+    },
+  },
+  discountedPrice: {
+    type: Number,
+    get: function () {
+      if (this.isSpecialOffer && this.discountPercentage > 0) {
+        return this.price - (this.price * this.discountPercentage) / 100;
+      }
+      return this.price;
+    },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

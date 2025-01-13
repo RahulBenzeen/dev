@@ -23,13 +23,20 @@ const addressSchema = new mongoose.Schema({
   },
   zipCode: {
     type: String,
-    required: true
+    required: true,
   },
   country: {
     type: String,
     required: true,
     maxlength: 50,
   },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',  // Reference to the User model
+    required: true,  // Ensure every address is associated with a user
+  },
+}, {
+  timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
 });
 
 const Address = mongoose.model("Address", addressSchema);

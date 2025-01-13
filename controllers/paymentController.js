@@ -4,7 +4,8 @@ const Order = require('../models/Order');
 const { CustomError } = require('../middlewares/errorHandler');
 const mongoose = require('mongoose');
 const Product = require('../models/Product')
-const Cart = require('../models/Cart')
+const Cart = require('../models/Cart');
+const sendEmail = require('../utils/emailServices/emailSender')
 // const sendEmailRequest = require('../utils/emailServices/emailProducer')
 require('dotenv').config(); 
 // Initialize Razorpay with your secret key
@@ -116,12 +117,12 @@ const createPaymentOrder = async (req, res, next) => {
 //       );
 
 //       const emailData = {
-//         recipient:'rahulbhardwaj@benzeenautoparts.net', // Customer's email
+//         recipient:'rahul018987@gmail.com', // Customer's email
 //         subject: 'Payment Confirmation - Order Placed Successfully',
 //         body: `Hello, your payment for Order ID: ${razorpay_order_id} has been successfully captured. Thank you for your purchase!`
 //       };
 
-//       // sendEmailRequest(emailData); // Send the email request to Kafka
+//       sendEmail(emailData); // Send the email request to Kafka
 //       return res.status(200).json({
 //         success: true,
 //         message: 'Payment completed successfully',
@@ -158,28 +159,26 @@ const confirmPayment = async (req, res, next) => {
 
       // Fetch the user's cart to get the products
       const userCart = await Cart.findOne({ user: userId }).populate('items.product').session(session);
-      if (!userCart || userCart.products.length === 0) {
+      if (!userCart || userCart.items.length === 0) {
         throw new Error('Cart is empty or invalid');
       }
-
+      
       // Remove the purchased products from the cart and update stock
-      for (let cartItem of userCart.products) {
-        const { productId, quantity } = cartItem;
-        
-        // Find the product and update its stock
-        const product = await Product.findById(productId).session(session);
-        if (product) {
-          // Decrease the stock
-          if (product.stock < quantity) {
-            throw new Error(`Not enough stock for product: ${product.name}`);
-          }
-          product.stock -= quantity;
-          await product.save({ session });
+      for (let cartItem of userCart.items) {
+        const { product, quantity } = cartItem;
+      
+        // Check and update stock
+        if (product.stock < quantity) {
+          throw new Error(`Not enough stock for product: ${product.name}`);
         }
+        product.stock -= quantity;
+        await product.save({ session });
       }
+      
 
       // Remove all products from the user's cart after the purchase is confirmed
-      await Cart.findOneAndUpdate({ userId }, { $set: { items: [] } }, { session });
+      await Cart.findOneAndUpdate({ user: userId }, { $set: { items: [] } }, { session });
+
 
       // Commit the transaction
       await session.commitTransaction();
@@ -191,8 +190,12 @@ const confirmPayment = async (req, res, next) => {
         subject: 'Payment Confirmation - Order Placed Successfully',
         body: `Hello, your payment for Order ID: ${razorpay_order_id} has been successfully captured. Thank you for your purchase!`
       };
-
-      // sendEmailRequest(emailData); // Send the email request to Kafka or another service
+      try {
+        await sendEmail(emailData); // Ensure proper error handling in sendEmail
+      } catch (emailError) {
+        console.error('Error sending confirmation email:', emailError.message);
+      }
+      
 
       return res.status(200).json({
         success: true,

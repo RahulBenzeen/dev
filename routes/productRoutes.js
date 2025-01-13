@@ -6,22 +6,26 @@ const {
   updateProduct,
   deleteProduct,
   getRecentlyViewedProducts,
-  getSimilarProducts
+  getSimilarProducts,
+  getSpecialOfferProducts
 } = require('../controllers/productController');
 
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
-
 const router = express.Router();
+
 // Public routes
 router.get('/all', getProducts);
-router.get('/:id', getProductById);
+router.get('/special-offers', getSpecialOfferProducts);  // Moved BEFORE /:id
+router.get('/recently-viewed', protect, getRecentlyViewedProducts);
+router.post('/add', protect, adminOnly, createProduct);
 router.get('/similar-products/:id', getSimilarProducts);
 
 // Admin routes
-router.post('/add', protect, adminOnly, createProduct);
 router.put('/:id', protect, adminOnly, updateProduct);
-router.get('/recently-viewed', protect, getRecentlyViewedProducts); // Add this route
 router.delete('/:id', protect, adminOnly, deleteProduct);
+
+// This should be LAST as it's the most generic route
+router.get('/:id', getProductById);
 
 module.exports = router;
