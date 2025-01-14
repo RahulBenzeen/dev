@@ -413,8 +413,6 @@ const getSpecialOfferProducts = async (req, res, next) => {
       .sort(sort)
       .skip(startIndex)
       .limit(limit)
-      .lean()
-      .exec();
 
     res.json({
       success: true,

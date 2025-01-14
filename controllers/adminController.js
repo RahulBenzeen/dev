@@ -86,14 +86,7 @@ const deleteProduct = async (req, res, next) => {
 // @desc    Get all users
 // @route   GET /api/admin/users
 // @access  Private, Admin
-// const getUsers = async (req, res, next) => {
-//   try {
-//     const users = await User.find();
-//     res.status(200).json({ success: true, users });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
+
 
 const getUsers = async (req, res, next) => {
   try {
@@ -166,6 +159,35 @@ const getCategories = async (req, res, next) => {
   }
 };
 
+// @desc    Delete a user
+// @route   DELETE /api/admin/users/:id
+// @access  Private, Admin
+const deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Find the user by ID
+    const user = await User.findById(id);
+
+    if (!user) {
+      throw new CustomError('User not found', 404);
+    }
+
+    // Optionally, you could delete associated orders, payments, etc. before deleting the user
+    // For example, deleting all orders associated with the user:
+    await Order.deleteMany({ user: id });
+
+    // Delete the user from the database
+    await User.findByIdAndDelete(id); // This replaces `user.remove()`
+
+    res.status(200).json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 module.exports = {
   getProducts,
   createProduct,
@@ -175,4 +197,5 @@ module.exports = {
   getOrders,
   getPayments,
   getCategories,
+  deleteUser
 };

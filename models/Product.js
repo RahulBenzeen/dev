@@ -67,19 +67,12 @@ const ProductSchema = new mongoose.Schema({
   },
   isSpecialOffer: {
     type: Boolean,
-    default: false, // Defaults to `false` if not provided
+    default: false,
   },
   discountPercentage: {
     type: Number,
     min: [0, 'Discount percentage cannot be negative'],
     max: [100, 'Discount percentage cannot exceed 100'],
-    validate: {
-      validator: function (v) {
-        // Ensure discountPercentage is only set when isSpecialOffer is true
-        return !this.isSpecialOffer || (v >= 0 && v <= 100);
-      },
-      message: 'Discount percentage must be between 0 and 100 if provided.',
-    },
   },
   discountedPrice: {
     type: Number,
@@ -94,6 +87,9 @@ const ProductSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+}, {
+  toJSON: { getters: true }, // Include getters in JSON output
+  toObject: { getters: true }, // Include getters in plain object output
 });
 
 module.exports = mongoose.model('Product', ProductSchema);

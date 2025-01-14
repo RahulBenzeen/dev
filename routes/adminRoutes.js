@@ -8,6 +8,7 @@ const {
   getOrders,
   getPayments,
   getCategories,
+  deleteUser
 } = require('../controllers/adminController');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
@@ -18,6 +19,7 @@ router.get('/products', protect, adminOnly, getProducts);
 router.post('/products', protect, adminOnly, createProduct);
 router.put('/products/:id', protect, adminOnly, updateProduct);
 router.delete('/products/:id', protect, adminOnly, deleteProduct);
+router.delete('/users/:id', deleteUser);
 
 // Admin Routes for managing users
 router.get('/users', protect, adminOnly, getUsers);

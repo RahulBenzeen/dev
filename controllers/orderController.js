@@ -17,7 +17,8 @@ const createOrder = async (req, res, next) => {
   try {
     const { products, shippingAddress, paymentMethod } = req.body;
     const userId = req.user.id;
-
+  
+     console.log('products is here ===> ', products)
     // Validate required fields
     if (!products || products.length === 0) {
       throw new CustomError("No products provided for the order", 400);
@@ -126,27 +127,30 @@ const getOrdersByUser = async (req, res, next) => {
 
     // Find orders for the specified user
     const orders = await Order.find({ user: req.user.id })
-      .populate({
-        path: 'products.product',
-        select: 'name price images', // Populate product fields
-      })
+      // .populate({
+      //   path: 'products.product',
+      //   select: 'name price images', // Populate specific fields from Product
+      // })
       .populate('user', 'name email'); // Populate user fields
-
-    // Filter out null products if any exist
-    orders.forEach((order) => {
-      order.products = order.products.filter((p) => p.product !== null);
-    });
 
     // Check if orders exist for the user
     if (!orders || orders.length === 0) {
       return res.status(404).json({ success: false, message: 'No orders found for this user' });
     }
 
+    // Optionally log products to debug population
+    orders.forEach(order => {
+      order.products.forEach(productEntry => {
+        console.log('Product:', productEntry.product); // Check if the product is populated
+      });
+    });
+
     res.status(200).json({ success: true, orders });
   } catch (error) {
     next(error);
   }
 };
+
 
 
 // @desc    Delete an order

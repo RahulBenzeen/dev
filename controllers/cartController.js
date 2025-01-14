@@ -5,11 +5,13 @@ const { CustomError } = require('../middlewares/errorHandler');
 // @desc    Add item to cart
 // @route   POST /api/cart
 // @access  Private
+// @desc    Add item to cart
+// @route   POST /api/cart
+// @access  Private
 const addItemToCart = async (req, res, next) => {
   try {
     const { _id, quantity } = req.body;
     const userId = req.user.id;
-    console.log({quantity})
 
     // Check if product exists
     const product = await Product.findById(_id);
@@ -26,7 +28,7 @@ const addItemToCart = async (req, res, next) => {
       // If no cart exists, create a new cart
       cart = new Cart({
         user: userId,
-        items: [{ product: _id, quantity, price: product.price }],
+        items: [{ product: _id, quantity, price: product.discountedPrice || product.price }],
       });
     } else {
       // Check if product is already in the cart
@@ -41,9 +43,11 @@ const addItemToCart = async (req, res, next) => {
         }
         // Update quantity if product already in cart
         cart.items[existingItemIndex].quantity = newQuantity;
+        // Keep the price updated to ensure discounted price if available
+        cart.items[existingItemIndex].price = product.discountedPrice || product.price;
       } else {
         // Add the new item to the cart
-        cart.items.push({ product: _id, quantity, price: product.price });
+        cart.items.push({ product: _id, quantity, price: product.discountedPrice || product.price });
       }
     }
 
@@ -58,7 +62,7 @@ const addItemToCart = async (req, res, next) => {
     next(error);
   }
 };
-;
+
 
 // @desc    Get the current cart
 // @route   GET /api/cart
@@ -66,7 +70,6 @@ const addItemToCart = async (req, res, next) => {
 const getCart = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user.id }).populate('items.product');
-    console.log({ user: req.user.id })
     if (!cart) {
       return res.status(404).json({
         success: false,
@@ -74,15 +77,26 @@ const getCart = async (req, res, next) => {
       });
     }
 
+    // Calculate total price by considering discounted price if available
+    let totalPrice = 0;
+    cart.items.forEach(item => {
+      totalPrice += item.quantity * item.price; // Use the stored price (discounted or regular)
+    });
+
     res.status(200).json({
       success: true,
       data: cart,
+      totalPrice: totalPrice.toFixed(2),
     });
   } catch (error) {
     next(error);
   }
 };
 
+
+// @desc    Update quantity of cart item
+// @route   PUT /api/cart/:itemId
+// @access  Private
 // @desc    Update quantity of cart item
 // @route   PUT /api/cart/:itemId
 // @access  Private
@@ -108,8 +122,9 @@ const updateCartItemQuantity = async (req, res, next) => {
       throw new CustomError('Not enough stock available', 400);
     }
 
-    // Update the item's quantity
+    // Update the item's quantity and price
     cart.items[itemIndex].quantity = quantity;
+    cart.items[itemIndex].price = product.discountedPrice || product.price;
 
     // Save the updated cart
     await cart.save();
