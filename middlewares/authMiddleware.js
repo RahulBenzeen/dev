@@ -3,6 +3,7 @@ const { CustomError } = require('./errorHandler');
 
 // Middleware to protect routes
 const protect = (req, res, next) => {
+  console.log(req.headers.authorization)
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) throw new CustomError('Not authorized, no token', 401);

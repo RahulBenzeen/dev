@@ -1,9 +1,9 @@
 const express = require('express');
-const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const fileUpload = require('express-fileupload');
 const connectDB = require('./config/database');
 const productRoutes = require('./routes/productRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -14,10 +14,14 @@ const adminRoutes = require('./routes/adminRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const whishlistRoutes = require('./routes/wishlistRoutes');
+
+
 const session = require('express-session');
 const { errorHandler } = require('./middlewares/errorHandler');
 
-dotenv.config();
+
 connectDB();
 
 const app = express();
@@ -33,7 +37,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
+app.use(fileUpload({ useTempFiles: true }));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'fallbackSecret',
@@ -88,6 +92,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/address', addressRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/wishlist', whishlistRoutes);
 
 // Error Handler
 app.use(errorHandler);

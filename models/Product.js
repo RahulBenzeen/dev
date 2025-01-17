@@ -28,10 +28,18 @@ const ProductSchema = new mongoose.Schema({
     required: [true, 'Product price is required'],
     min: [0, 'Price must be a positive number'],
   },
-  images: {
-    type: [String],
-    required: [true, 'Product images are required'],
-  },
+  images: [
+    {
+      secure_url: {
+        type: String,
+        required: [true, 'Image URL is required'],
+      },
+      public_id: {
+        type: String,
+        required: [true, 'Image public ID is required'],
+      },
+    },
+  ],
   rating: {
     type: Number,
     default: 0,

@@ -5,15 +5,19 @@ const {
   getProfile,
   updateProfile,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  googleLogin,  // Import the Google Login controller
+  verifyEmail
 } = require('../controllers/userController');
-const { protect , verifyToken} = require('../middlewares/authMiddleware');
+const { protect, verifyToken } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 // Public routes
 router.post('/register', registerUser);
+router.get('/verify-email/:token', verifyEmail);
 router.post('/login', loginUser);
+router.post('/google-login', googleLogin); // Add Google Login route
 
 // Private routes
 router.get('/profile', protect, getProfile);

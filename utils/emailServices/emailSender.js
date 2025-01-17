@@ -1,28 +1,24 @@
-// backend/emailService/emailSender.js
 
-require('dotenv').config();
 const nodemailer = require('nodemailer');
-// Create an SMTP transporter
 
-// SMTP_USER=rahul018987@gamil.com
-// SMTP_PASS=@@@rahul2000
+// Configure transporter for your custom SMTP server
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: false,  // Use TLS
+    host: process.env.SMTP_HOST,  // Your SMTP server hostname
+    port: process.env.SMTP_PORT,                    // Port for SSL/TLS
+    secure: true,                 // Use SSL/TLS
     auth: {
-        user: 'rahul018987@gamil.com',
-        pass: '@@@rahul2000'
-    }
+        user: process.env.SMTP_USER,  // Your email address
+        pass: process.env.SMTP_PASS,  // Your email password or app password if 2FA is enabled
+    },
 });
 
 // Send email using SMTP
 const sendEmail = async (emailData) => {
     const mailOptions = {
-        from: process.env.SMTP_USER, // Sender address
-        to: emailData.recipient, // List of recipients
-        subject: emailData.subject, // Subject line
-        text: emailData.body // Email body
+        from: process.env.SMTP_USER,  // Sender address
+        to: emailData.recipient,                    // Recipient email
+        subject: emailData.subject,                 // Email subject
+        text: emailData.message,                       // Email body
     };
 
     return transporter.sendMail(mailOptions)

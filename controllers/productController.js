@@ -1,5 +1,7 @@
 const Product = require('../models/Product');
 const { CustomError } = require('../middlewares/errorHandler');
+const cloudinary = require('../utils/cloudanryImages/cloudnaryImageServices');
+const Image = require('../models/Image')
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -104,6 +106,8 @@ const { CustomError } = require('../middlewares/errorHandler');
 //     next(error);
 //   }
 // };
+
+
 
 const getProducts = async (req, res, next) => {
   try {
@@ -376,7 +380,7 @@ const getSimilarProducts = async (req, res, next) => {
 };
 
 const getSpecialOfferProducts = async (req, res, next) => {
-  console.log('getSpecialOfferProducts');
+
   try {
     const page = Number(req.query.page) > 0 ? parseInt(req.query.page, 10) : 1;
     const limit = Number(req.query.limit) > 0 ? parseInt(req.query.limit, 10) : 10;
@@ -434,6 +438,105 @@ const getSpecialOfferProducts = async (req, res, next) => {
 };
 
 
+const getCloudinaryImages = async (req, res, next) => {
+  try {
+    // Fetch all images from the Image collection
+    const images = await Image.find(); // Add filtering or sorting if needed
+
+    // Respond with the fetched images
+    res.status(200).json({
+      success: true,
+      message: 'Images retrieved successfully',
+      images,
+    });
+  } catch (error) {
+    console.error('Error retrieving images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving images',
+      error,
+    });
+    next(error);
+  }
+};
+
+
+
+const uploadProductImage = async (req, res, next) => {
+
+  try {
+    const file = req.files.image; // Assuming you're using express-fileupload
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'No image file provided' });
+    }
+
+    // Upload image to Cloudinary
+    const cloudinaryResponse = await cloudinary.uploader.upload(file.tempFilePath, {
+      folder: 'products', // Optional: you can specify a folder name in Cloudinary
+    });
+
+    // Save image URL and public_id in the Image table
+    const image = await Image.create({
+      url: cloudinaryResponse.secure_url,
+      public_id: cloudinaryResponse.public_id,
+      // If you have a productId, you can include it here
+      productId: req.body.productId, // Assuming you're passing a productId in the request body
+    });
+
+    // Return the response with the saved image information
+    res.status(200).json({
+      success: true,
+      message: 'Image uploaded and saved successfully',
+      image: {
+        url: image.url,
+        public_id: image.public_id,
+        productId: image.productId,
+      },
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    next(error);
+  }
+};
+
+
+const deleteCloudinaryImage = async (req, res, next) => {
+  try {
+    const { id } = req.params; // Image ID from the request params
+
+    // Find the image in the database
+    const image = await Image.findById(id);
+    if (!image) {
+      return res.status(404).json({
+        success: false,
+        message: 'Image not found',
+      });
+    }
+
+    // Delete the image from Cloudinary
+    await cloudinary.uploader.destroy(image.public_id);
+
+    // Delete the image record from the database
+    await Image.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting image',
+      error,
+    });
+    next(error);
+  }
+};
+
+
+
+
 module.exports = { 
   getProducts, 
   getProductById, 
@@ -442,5 +545,8 @@ module.exports = {
   deleteProduct, 
   getRecentlyViewedProducts, 
   getSimilarProducts,
-  getSpecialOfferProducts
+  getSpecialOfferProducts,
+  getCloudinaryImages,
+  uploadProductImage,
+  deleteCloudinaryImage
 };
