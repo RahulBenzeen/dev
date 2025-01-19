@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const fileUpload = require('express-fileupload');
 const connectDB = require('./config/database');
+const MongoStore = require('connect-mongo');
 const productRoutes = require('./routes/productRoutes');
 const userRoutes = require('./routes/userRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -27,7 +28,7 @@ const app = express();
 // Middlewares
 app.use(
   cors({
-    origin: 'http://127.0.0.1:5173', // The frontend URL
+    origin: process.env.FRONTEND_URL, // The frontend URL
     credentials: true, // Allow cookies to be sent
   })
 );
@@ -36,24 +37,26 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(fileUpload({ useTempFiles: true }));
+
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'fallbackSecret',
     resave: false,
     saveUninitialized: true,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI, // Your MongoDB connection string
+      collectionName: 'sessions',
+    }),
     cookie: {
       maxAge: 30 * 60 * 1000, // 30 minutes
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      httpOnly: true, // Prevent JS access
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
     },
+    rolling:true
   })
 );
 
-// Debugging middleware (remove in production)
-// app.use((req, res, next) => {
-//   console.log("Session Data:", req.session);
-//   next();
-// });
 
 app.get('/api/test-session', (req, res) => {
   if (req.session.user) {

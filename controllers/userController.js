@@ -5,7 +5,7 @@ const sendEmail = require('../utils/emailServices/emailSender'); // Utility to s
 const { CustomError } = require('../middlewares/errorHandler');
 const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
@@ -77,39 +77,9 @@ const verifyEmail = async (req, res, next) => {
 };
 
 
-
 // @desc    Register a new user
 // @route   POST /api/users/register
 // @access  Public
-// const registerUser = async (req, res, next) => {
-//   try {
-//     const { name, email, password } = req.body;
-
-//     // Check if user already exists
-//     const userExists = await User.findOne({ email });
-//     if (userExists) throw new CustomError('User already exists', 400);
-
-//     const user = await User.create({ name, email, password });
-
-//     req.session.user = {
-//       id: user._id,
-//       email: user.email,
-//       role: user.role,
-//     }
-
-//     res.status(201).json({
-//       success: true,
-//       data: {
-//         id: user._id,
-//         name: user.name,
-//         email: user.email,
-//         token: generateToken(user._id, user.role),
-//       },
-//     });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 
 const registerUser = async (req, res, next) => {
   try {

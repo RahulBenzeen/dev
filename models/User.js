@@ -58,24 +58,7 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Encrypt password before saving the user
-// UserSchema.pre('save', async function (next) {
-//   // If the user has a Google ID, skip the password check
-//   if (this.googleId) return next();
 
-//   // If the password field is being modified, hash it
-//   if (this.isModified('password') && this.password) {
-//     const salt = await bcrypt.genSalt(10);
-//     this.password = await bcrypt.hash(this.password, salt);
-//   }
-
-//   // If no password is provided, and it's not a Google user, throw an error
-//   if (!this.password && !this.googleId) {
-//     return next(new Error('Password is required for non-Google users'));
-//   }
-
-//   next();
-// });
 
 // Encrypt password before saving the user
 UserSchema.pre('save', async function (next) {

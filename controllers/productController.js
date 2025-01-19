@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const { CustomError } = require('../middlewares/errorHandler');
 const cloudinary = require('../utils/cloudanryImages/cloudnaryImageServices');
+const { Types: { ObjectId } } = require('mongoose');
 const Image = require('../models/Image')
 
 // @desc    Get all products
@@ -202,64 +203,49 @@ const getProducts = async (req, res, next) => {
 // @desc    Get single product by ID
 // @route   GET /api/products/:id
 // @access  Public
-// const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
 
-// const getProductById = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Check cache
-//     const cacheKey = `product:${id}`;
-//     const cachedData = await redisClient.get(cacheKey);
-
-//     if (cachedData) {
-//       return res.status(200).json(JSON.parse(cachedData));
-//     }
-
-//     const product = await Product.findById(id);
-//     if (!product) throw new CustomError('Product not found', 404);
-
-//     // Cache the product data
-//     await redisClient.setEx(cacheKey, 600, JSON.stringify({ success: true, data: product }));
-
-//     res.status(200).json({ success: true, data: product });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 
 const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const product = await Product.findById(id);
-    if (!product) throw new CustomError('Product not found', 404);
+    // Validate the product ID
+    if (!ObjectId.isValid(id)) {
+      throw new CustomError('Invalid product ID', 400);
+    }
 
+    // Fetch the product by ID
+    const product = await Product.findById(id);
+    if (!product) {
+      throw new CustomError('Product not found', 404);
+    }
+
+    // Check if the user is logged in (optional chaining for safety)
+    const userId = req.session?.user?.id;
+
+    if (userId) {
+      // Ensure session structure for recentlyViewed
+      req.session.recentlyViewed = req.session.recentlyViewed || {};
+      req.session.recentlyViewed[userId] = req.session.recentlyViewed[userId] || [];
+
+      // Add the product ID to the user's recentlyViewed list
+      const userRecentlyViewed = req.session.recentlyViewed[userId];
+      if (!userRecentlyViewed.includes(id)) {
+        userRecentlyViewed.push(id);
+
+        // Limit to the last 5 products
+        if (userRecentlyViewed.length > 4) {
+          userRecentlyViewed.shift();
+        }
+      }
+    }
+
+    // Send the product data as a response
     res.status(200).json({ success: true, data: product });
   } catch (error) {
     next(error);
   }
 };
-
-
-
-// @desc    Create a new product
-// @route   POST /api/products
-// @access  Admin
-// const createProduct = async (req, res, next) => {
-//   try {
-//     const { category, subcategory, brand } = req.body;
-//     const sku = generateSku(category, subcategory, brand);
-//     const product = await Product.create({ ...req.body, sku });
-
-//     // Clear all product-related cache (optional)
-//     await redisClient.flushAll();
-
-//     res.status(201).json({ success: true, data: product });
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 
 const createProduct = async (req, res, next) => {
   try {
@@ -272,8 +258,6 @@ const createProduct = async (req, res, next) => {
     next(error);
   }
 };
-
-
 
 const generateSku = (category, subcategory, brand) => {
   // Format: [Category][Subcategory][Brand Initials][Timestamp/UniqueNumber]
@@ -318,35 +302,34 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
-const ObjectId = require('mongoose').Types.ObjectId;
-
 const getRecentlyViewedProducts = async (req, res, next) => {
-
+console.log(req.session)
   try {
-    // Log raw session data for debugging
-    console.log('Raw session data:', req.session.recentlyViewed);
+    // Check if the user is logged in
+    const userId = req.session.user.id; // Assuming userId is stored in the session
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'User not logged in' });
+    }
 
-    // Ensure that session contains only valid ObjectIds
-    const validIds = req.session.recentlyViewed.filter(id => /^[0-9a-fA-F]{24}$/.test(id));
-    console.log('Valid IDs:', validIds); // Check the validIds array
+    // Check if the user has any recently viewed products in their session
+    const userRecentlyViewed = req.session.recentlyViewed?.[userId] || [];
+    console.log('User recently viewed product IDs:', userRecentlyViewed);
 
-    // If there are no valid IDs, return an empty array
+    // Ensure the session contains only valid ObjectIds
+    const validIds = userRecentlyViewed.filter(id => /^[0-9a-fA-F]{24}$/.test(id));
     if (validIds.length === 0) {
-      console.log('No valid product IDs in session');
       return res.status(200).json({ success: true, data: [] });
     }
 
-    // Find products using the valid ObjectIds
+    // Fetch products from the database
     const products = await Product.find({ _id: { $in: validIds } });
-
-    console.log('Found products:', products); // Check the products fetched from DB
 
     // Sort the products based on the order in the session
     const sortedProducts = validIds.map(id =>
       products.find(product => product._id.toString() === id)
     );
 
-    res.status(200).json({ success: true, data: sortedProducts });
+    return res.status(200).json({ success: true, data: sortedProducts });
   } catch (error) {
     console.error('Error fetching recently viewed products:', error);
     return res.status(500).json({ success: false, message: error.message });
@@ -437,7 +420,6 @@ const getSpecialOfferProducts = async (req, res, next) => {
   }
 };
 
-
 const getCloudinaryImages = async (req, res, next) => {
   try {
     // Fetch all images from the Image collection
@@ -459,8 +441,6 @@ const getCloudinaryImages = async (req, res, next) => {
     next(error);
   }
 };
-
-
 
 const uploadProductImage = async (req, res, next) => {
 
@@ -499,7 +479,6 @@ const uploadProductImage = async (req, res, next) => {
   }
 };
 
-
 const deleteCloudinaryImage = async (req, res, next) => {
   try {
     const { id } = req.params; // Image ID from the request params
@@ -533,7 +512,6 @@ const deleteCloudinaryImage = async (req, res, next) => {
     next(error);
   }
 };
-
 
 
 

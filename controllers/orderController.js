@@ -127,10 +127,10 @@ const getOrdersByUser = async (req, res, next) => {
 
     // Find orders for the specified user
     const orders = await Order.find({ user: req.user.id })
-      // .populate({
-      //   path: 'products.product',
-      //   select: 'name price images', // Populate specific fields from Product
-      // })
+      .populate({
+        path: 'products.product',
+        select: 'name price images', // Populate specific fields from Product
+      })
       .populate('user', 'name email'); // Populate user fields
 
     // Check if orders exist for the user
