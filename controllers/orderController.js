@@ -1,6 +1,6 @@
 const Order = require('../models/Order');
 const { CustomError } = require('../middlewares/errorHandler');
-
+const { initiateRefund } = require('../controllers/paymentController')
 // @desc    Get all orders
 // @route   GET /api/admin/orders
 // @access  Private, Admin
@@ -168,11 +168,63 @@ const deleteOrder = async (req, res, next) => {
   }
 };
 
+
+// @desc    Cancel an order
+// @route   PUT /api/orders/:id/cancel
+// @access  Private, User
+const cancelOrder = async (req, res, next) => {
+  console.log(req.params)
+  try {
+    const orderId = req.params.id;
+    req.body.OrderId = orderId
+
+    // Find the order by ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new CustomError('Order not found', 404);
+    }
+
+    // Ensure the user is the owner of the order or has the proper role
+    if (order.user.toString() !== req.user.id && !req.user.isAdmin) {
+      throw new CustomError('You are not authorized to cancel this order', 403);
+    }
+
+    // Check if the order can be cancelled
+    if (order.orderStatus === 'delivered' || order.orderStatus === 'cancelled') {
+      throw new CustomError(`Order cannot be cancelled as it is already ${order.orderStatus}`, 400);
+    }
+
+    // Update the order status to 'cancelled'
+    order.orderStatus = 'cancelled';
+
+    // Handle refund if payment was completed
+    if (order.paymentStatus === 'pending') {
+      // Replace with actual refund logic (e.g., Razorpay API call)
+      initiateRefund(req, res, next)
+      console.log(`Initiating refund for order ${orderId}`);
+      // Add refund details to the order
+      order.paymentStatus = 'refunded';
+    }
+
+    // Save the updated order
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Order cancelled successfully',
+      order,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
   updateOrderStatus,
   deleteOrder,
   createOrder,
-  getOrdersByUser
+  getOrdersByUser,
+  cancelOrder
 };

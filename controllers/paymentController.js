@@ -81,60 +81,6 @@ const createPaymentOrder = async (req, res, next) => {
 };
 
 
-// @desc    Confirm the payment and update payment status (Razorpay)
-// @route   POST /api/payment/confirm
-// @access  Private
-// const confirmPayment = async (req, res, next) => {
-//   try {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-//     console.log('Payment Details:', { razorpay_order_id, razorpay_payment_id, razorpay_signature });
-
-//     // Fetch payment details using payment ID
-//     const payment = await razorpay.payments.fetch(razorpay_payment_id);
-//     console.log('Fetched Payment:', payment);
-
-//     if (payment.status === 'captured') {
-//       // Verify the payment signature
-//       // const isSignatureValid = razorpay.utils.verifyPaymentSignature({
-//       //   order_id: razorpay_order_id,
-//       //   payment_id: razorpay_payment_id,
-//       //   signature: razorpay_signature,
-//       // });
-
-
-//       // if (!isSignatureValid) {
-//       //   throw new Error('Payment signature verification failed');
-//       // }
-
-
-//       // Update payment status in the database
-//       const updatedPayment = await Payment.findOneAndUpdate(
-//         { transactionId: razorpay_payment_id },
-//         { paymentStatus: 'completed' },
-//         { new: true }
-//       );
-
-//       const emailData = {
-//         recipient:'rahul018987@gmail.com', // Customer's email
-//         subject: 'Payment Confirmation - Order Placed Successfully',
-//         body: `Hello, your payment for Order ID: ${razorpay_order_id} has been successfully captured. Thank you for your purchase!`
-//       };
-
-//       sendEmail(emailData); // Send the email request to Kafka
-//       return res.status(200).json({
-//         success: true,
-//         message: 'Payment completed successfully',
-//         payment: updatedPayment,
-//       });
-//     } else {
-//       throw new Error(`Payment status is not 'captured': ${payment.status}`);
-//     }
-//   } catch (error) {
-//     console.error('Error in confirmPayment:', error.message);
-//     return next(error);
-//   }
-// };
 
 const confirmPayment = async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -269,8 +215,100 @@ const handlePaymentFailure = async (req, res, next) => {
   }
 };
 
+const initiateRefund = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { orderId } = req.body;
+    const userId = req.user.id;
+
+    // Fetch order and payment details
+    const order = await Order.findById(orderId).session(session);
+    if (!order || order.user.toString() !== userId.toString()) {
+      throw new CustomError('Order not found or does not belong to the user', 404);
+    }
+
+    const payment = await Payment.findOne({ orderId }).session(session);
+    if (!payment || payment.paymentStatus !== 'completed') {
+      throw new CustomError('Payment not found or is not completed for this order', 400);
+    }
+
+    // Check if a refund already exists
+    if (payment.paymentStatus === 'refunded') {
+      return res.status(400).json({ message: 'Refund already processed for this payment' });
+    }
+
+    // Initiate refund via Razorpay
+    const refund = await razorpay.payments.refund(payment.transactionId, {
+      amount: payment.amount * 100, // Amount in paise
+    });
+
+    // Update payment status in the database
+    payment.paymentStatus = 'refunded';
+    payment.refundResponse = refund;
+    await payment.save({ session });
+
+    // Update order status
+    order.status = 'cancelled';
+    await order.save({ session });
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    // Fetch the user's email and name
+    const user = await User.findById(userId).select('email name');
+    if (!user || !user.email) {
+      throw new Error('User email not found');
+    }
+
+    // Send refund email to the user
+    const emailData = {
+      recipient: user.email,
+      subject: 'Order Cancellation and Refund Initiated',
+      message: `
+        Hello ${user.name || 'Valued Customer'},
+
+        We have successfully initiated the refund for your order with Order ID: ${orderId}.
+        
+        **Refund Details:**
+        Amount Refunded: ₹${payment.amount}
+        Refund Status: ${refund.status}
+
+        Please allow 5-7 business days for the refund to reflect in your account.
+
+        If you have any questions or concerns, please contact our support team at support@example.com.
+
+        Best regards,
+        Your E-commerce Team
+      `,
+    };
+
+    try {
+      await sendEmail(emailData);
+    } catch (emailError) {
+      console.error('Error sending refund email:', emailError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Refund initiated successfully',
+      refund,
+    });
+  } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error in refund initiation:', error.message);
+    return next(error);
+  }
+};
+
+
 module.exports = {
   createPaymentOrder,
   confirmPayment,
   handlePaymentFailure,
+  initiateRefund
 };

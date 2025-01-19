@@ -14,7 +14,7 @@ const OrderSchema = new mongoose.Schema(
           ref: 'Product',
           required: true,
         },
-        name: { type: String, required: true }, // Include product name for easier reference
+        name: { type: String, required: true },
         quantity: { type: Number, required: true },
         price: { type: Number, required: true },
       },
@@ -25,12 +25,8 @@ const OrderSchema = new mongoose.Schema(
     },
     shippingAddress: {
       name: { type: String, required: true },
-      // street: { type: String, required: true },
-      // city: { type: String, required: true },
-      // state: { type: String, required: true },
       country: { type: String, required: true },
       postalCode: { type: String, required: true },
-      // phone: { type: String, required: true },
     },
     paymentStatus: {
       type: String,
@@ -39,7 +35,17 @@ const OrderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['pending', 'shipped', 'delivered', 'cancelled'],
+      enum: [
+        'pending',       // Order placed but not yet processed
+        'processing',    // Order is being prepared
+        'packed',        // Order is packed and ready for shipment
+        'shipped',       // Order has been handed over to the courier
+        'in-transit',    // Order is in transit to the destination
+        'delivered',     // Order has been delivered to the customer
+        'cancelled',     // Order was cancelled
+        'returned',      // Order has been returned by the customer
+        'refunded',      // Refund processed for the order
+      ],
       default: 'pending',
     },
     paymentMethod: {
