@@ -18,6 +18,6 @@ router.post('/add', protect, addToWishlist);
 // @route   DELETE /api/wishlist
 // @desc    Remove product from the user's wishlist
 // @access  Private (authenticated users only)
-router.delete('/remove', protect, removeFromWishlist);
+router.delete('/remove/:productId', protect, removeFromWishlist);
 
 module.exports = router;

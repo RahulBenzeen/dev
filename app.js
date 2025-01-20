@@ -21,9 +21,7 @@ const whishlistRoutes = require('./routes/wishlistRoutes');
 const session = require('express-session');
 const { errorHandler } = require('./middlewares/errorHandler');
 
-
 connectDB();
-
 const app = express();
 
 // Middlewares
