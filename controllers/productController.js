@@ -353,7 +353,7 @@ const getSimilarProducts = async (req, res, next) => {
       _id: { $ne: currentProduct._id },
     })
       .limit(10)
-      .select('name images price rating stock');
+      .select('name images price rating stock description');
 
     res.status(200).json({ success: true, data: similarProducts });
   } catch (error) {
