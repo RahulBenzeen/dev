@@ -22,64 +22,57 @@ const createPaymentOrder = async (req, res, next) => {
     const { orderId, paymentMethod } = req.body;
     const userId = req.user.id;
 
-    try {
-      // Check if order exists and belongs to the user
-      const order = await Order.findById(orderId);
-      if (!order || order.user.toString() !== userId.toString()) {
-        throw new CustomError('Order not found or does not belong to the user', 404);
-      }
-      // Calculate the total amount from the order
-
-      const amount = order.totalPrice * 100; // Razorpay requires amount in paise (1 INR = 100 paise)
-
-      try {
-        // Create a payment order with Razorpay
-        const paymentOrder = await razorpay.orders.create({
-          amount: amount, // Amount in paise
-          currency: 'INR',
-          receipt: `order_rcptid_${orderId}`,
-          notes: {
-            userId: userId,
-            orderId: orderId,
-          },
-        });
-
-
-        try {
-          // Save payment info in database
-          const payment = await Payment.create({
-            user: userId,
-            orderId: orderId,
-            paymentMethod: paymentMethod || 'razorpay',
-            amount: amount / 100, // Store amount in INR (not paise)
-            paymentStatus: 'pending',
-            transactionId: paymentOrder.id,
-            paymentResponse: paymentOrder,
-          });
-
-          res.status(200).json({
-            success: true,
-            orderId: paymentOrder.id, // Return Razorpay order ID for frontend
-            paymentId: payment.id, // Save payment details to track it
-          });
-        } catch (paymentError) {
-          console.error("Error saving payment info:", paymentError);
-          next(paymentError); // Pass the error to the next middleware
-        }
-      } catch (razorpayError) {
-        console.error("Error creating Razorpay order:", razorpayError);
-        next(razorpayError); // Pass the error to the next middleware
-      }
-    } catch (orderError) {
-      console.error("Error fetching order:", orderError);
-      next(orderError); // Pass the error to the next middleware
+    // Fetch the order and validate
+    const order = await Order.findById(orderId);
+    if (!order || order.user.toString() !== userId.toString()) {
+      throw new CustomError('Order not found or does not belong to the user', 404);
     }
+
+    // Ensure the order is eligible for payment
+    if (order.paymentStatus === 'completed' || order.orderStatus === 'cancelled') {
+      throw new CustomError('Order cannot be paid as it is either already completed or cancelled', 400);
+    }
+
+    // Calculate the total amount in paise
+    const amountInPaise = order.totalPrice * 100;
+
+    // Create a payment order with Razorpay
+    const paymentOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: `order_rcptid_${orderId}`,
+      notes: {
+        userId: userId,
+        orderId: orderId,
+      },
+    });
+    order.razorpayOrderId = paymentOrder.id;
+    await order.save();
+
+    // Save payment info in the database
+    const payment = await Payment.create({
+      user: userId,
+      orderId: orderId,
+      paymentMethod: paymentMethod || 'razorpay',
+      amount: order.totalPrice, // Store amount in INR
+      paymentStatus: 'pending',
+      transactionId: paymentOrder.id,
+      paymentResponse: paymentOrder,
+    });
+
+    // Respond with payment details
+    res.status(200).json({
+      success: true,
+      message: 'Payment order created successfully',
+      orderId: paymentOrder.id, // Return Razorpay order ID for frontend
+      paymentId: payment.id, // Save payment details to track it
+      amount: order.totalPrice, // Return amount for display
+    });
   } catch (error) {
-    console.error("Unexpected error:", error);
-    next(error); // Pass any unexpected error to the next middleware
+    console.error("Error creating payment order:", error);
+    next(error); // Pass the error to the next middleware
   }
 };
-
 
 
 const confirmPayment = async (req, res, next) => {
@@ -93,13 +86,26 @@ const confirmPayment = async (req, res, next) => {
     // Fetch payment details using payment ID
     const payment = await razorpay.payments.fetch(razorpay_payment_id);
 
+
     if (payment.status === 'captured') {
       // Update payment status in the database
       const updatedPayment = await Payment.findOneAndUpdate(
-        { transactionId: razorpay_payment_id },
+        { transactionId: payment.order_id },
+        { paymentStatus: 'completed', paymentId:razorpay_payment_id},
+        { new: true, session }
+      );
+    
+
+      // Fetch the order associated with this payment
+      const order = await Order.findOneAndUpdate(
+        { razorpayOrderId: razorpay_order_id, user: userId, paymentStatus: 'pending' },
         { paymentStatus: 'completed' },
         { new: true, session }
       );
+
+      if (!order) {
+        throw new Error('Order not found or already updated');
+      }
 
       // Fetch the user's cart to get the products
       const userCart = await Cart.findOne({ user: userId }).populate('items.product').session(session);
@@ -123,7 +129,7 @@ const confirmPayment = async (req, res, next) => {
       await Cart.findOneAndUpdate({ user: userId }, { $set: { items: [] } }, { session });
 
       // Fetch the user's email and name from the database
-      const user = await User.findById(userId).select('email name'); // Fetch email and name
+      const user = await User.findById(userId).select('email name');
       if (!user || !user.email) {
         throw new Error('User email not found');
       }
@@ -134,12 +140,12 @@ const confirmPayment = async (req, res, next) => {
 
       // Send confirmation email to the user
       const emailData = {
-        recipient: user.email, // The user's email fetched from the database
+        recipient: user.email,
         subject: 'Payment Confirmation - Order Placed Successfully',
         message: `
           Hello ${user.name || 'Valued Customer'}, 
           
-          We are excited to inform you that your payment for Order ID: ${razorpay_order_id} has been successfully captured. 
+          We are excited to inform you that your payment for Order ID: ${order._id} has been successfully captured. 
           
           **Order Details:**
           ${userCart.items
@@ -166,30 +172,27 @@ const confirmPayment = async (req, res, next) => {
       };
 
       try {
-        await sendEmail(emailData); // Ensure proper error handling in sendEmail
+        await sendEmail(emailData);
       } catch (emailError) {
         console.error('Error sending confirmation email:', emailError.message);
-        // Optional: Log to a service or notify the user
       }
 
       return res.status(200).json({
         success: true,
         message: 'Payment completed successfully',
         payment: updatedPayment,
+        order,
       });
     } else {
       throw new Error(`Payment status is not 'captured': ${payment.status}`);
     }
   } catch (error) {
-    // Rollback the transaction if an error occurs
     await session.abortTransaction();
     session.endSession();
     console.error('Error in confirmPayment:', error.message);
     return next(error);
   }
 };
-
-
 
 // @desc    Handle payment failures (Razorpay)
 // @route   POST /api/payment/fail
@@ -216,6 +219,8 @@ const handlePaymentFailure = async (req, res, next) => {
 };
 
 const initiateRefund = async (req, res, next) => {
+
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -225,22 +230,31 @@ const initiateRefund = async (req, res, next) => {
 
     // Fetch order and payment details
     const order = await Order.findById(orderId).session(session);
+
+
     if (!order || order.user.toString() !== userId.toString()) {
       throw new CustomError('Order not found or does not belong to the user', 404);
     }
 
     const payment = await Payment.findOne({ orderId }).session(session);
+     console.log({payment})
+
     if (!payment || payment.paymentStatus !== 'completed') {
       throw new CustomError('Payment not found or is not completed for this order', 400);
     }
 
     // Check if a refund already exists
     if (payment.paymentStatus === 'refunded') {
-      return res.status(400).json({ message: 'Refund already processed for this payment' });
+      throw new  CustomError('Refund already processed for this payment', 400);
+    }
+
+    // Ensure the order is eligible for refund
+    if (order.orderStatus === 'delivered') {
+      throw new CustomError('Delivered orders cannot be refunded', 400);
     }
 
     // Initiate refund via Razorpay
-    const refund = await razorpay.payments.refund(payment.transactionId, {
+    const refund = await razorpay.payments.refund(payment.paymentId, {
       amount: payment.amount * 100, // Amount in paise
     });
 
@@ -250,7 +264,7 @@ const initiateRefund = async (req, res, next) => {
     await payment.save({ session });
 
     // Update order status
-    order.status = 'cancelled';
+    order.orderStatus = 'cancelled'; // Update to 'cancelled' after refund
     await order.save({ session });
 
     // Commit the transaction
@@ -287,6 +301,7 @@ const initiateRefund = async (req, res, next) => {
 
     try {
       await sendEmail(emailData);
+      console.log('mail sending successfully refund')
     } catch (emailError) {
       console.error('Error sending refund email:', emailError.message);
     }
@@ -300,11 +315,10 @@ const initiateRefund = async (req, res, next) => {
     // Rollback transaction on error
     await session.abortTransaction();
     session.endSession();
-    console.error('Error in refund initiation:', error.message);
+    console.error('Error in refund initiation:', error);
     return next(error);
   }
 };
-
 
 module.exports = {
   createPaymentOrder,

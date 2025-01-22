@@ -151,8 +151,6 @@ const getOrdersByUser = async (req, res, next) => {
   }
 };
 
-
-
 // @desc    Delete an order
 // @route   DELETE /api/admin/orders/:id
 // @access  Private, Admin
@@ -173,10 +171,8 @@ const deleteOrder = async (req, res, next) => {
 // @route   PUT /api/orders/:id/cancel
 // @access  Private, User
 const cancelOrder = async (req, res, next) => {
-  console.log(req.params)
   try {
     const orderId = req.params.id;
-    req.body.OrderId = orderId
 
     // Find the order by ID
     const order = await Order.findById(orderId);
@@ -194,20 +190,18 @@ const cancelOrder = async (req, res, next) => {
       throw new CustomError(`Order cannot be cancelled as it is already ${order.orderStatus}`, 400);
     }
 
-    // Update the order status to 'cancelled'
-    order.orderStatus = 'cancelled';
-
-    // Handle refund if payment was completed
-    if (order.paymentStatus === 'pending') {
-      // Replace with actual refund logic (e.g., Razorpay API call)
-      initiateRefund(req, res, next)
-      console.log(`Initiating refund for order ${orderId}`);
-      // Add refund details to the order
-      order.paymentStatus = 'refunded';
+    // Initiate refund if payment was completed
+    if (order.paymentStatus === 'completed') {
+      req.body.orderId = orderId; // Pass orderId to `initiateRefund`
+      console.log("refund initiated")
+      await initiateRefund(req, res, next); // Await refund processing
+      console.log('refund completed !')
+      return; // Ensure no duplicate response is sent
     }
 
-    // Save the updated order
-    await order.save();
+    // // Update order status to 'cancelled' for unpaid orders
+    // order.orderStatus = 'cancelled';
+    // await order.save();
 
     res.status(200).json({
       success: true,

@@ -28,6 +28,7 @@ const OrderSchema = new mongoose.Schema(
       country: { type: String, required: true },
       postalCode: { type: String, required: true },
     },
+    razorpayOrderId: { type: String },
     paymentStatus: {
       type: String,
       enum: ['pending', 'completed', 'failed'],

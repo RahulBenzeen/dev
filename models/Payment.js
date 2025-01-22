@@ -34,6 +34,8 @@ const PaymentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    paymentId: String,
+
     paymentResponse: {
       type: Object, // Store response from payment gateway (e.g., Razorpay)
       required: true,
