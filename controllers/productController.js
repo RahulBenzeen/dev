@@ -303,7 +303,7 @@ const deleteProduct = async (req, res, next) => {
 };
 
 const getRecentlyViewedProducts = async (req, res, next) => {
-console.log(req.session)
+
   try {
     // Check if the user is logged in
     const userId = req.session.user.id; // Assuming userId is stored in the session

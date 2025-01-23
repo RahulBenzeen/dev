@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const { CustomError } = require('../middlewares/errorHandler');
 const { initiateRefund } = require('../controllers/paymentController')
+
 // @desc    Get all orders
 // @route   GET /api/admin/orders
 // @access  Private, Admin
@@ -133,11 +134,11 @@ const getOrdersByUser = async (req, res, next) => {
     }
 
     // Optionally log products to debug population
-    orders.forEach(order => {
-      order.products.forEach(productEntry => {
-        console.log('Product:', productEntry.product); // Check if the product is populated
-      });
-    });
+    // orders.forEach(order => {
+    //   order.products.forEach(productEntry => {
+    //     console.log('Product:', productEntry.product); // Check if the product is populated
+    //   });
+    // });
 
     res.status(200).json({ success: true, orders });
   } catch (error) {

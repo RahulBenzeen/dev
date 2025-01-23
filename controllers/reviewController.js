@@ -43,7 +43,6 @@ const addReview = async (req, res, next) => {
     const { productId, rating, comment } = req.body;
     const userId = req.user.id;
     const userName  = req.user.name;
-    console.log({userName});
 
     // Check if the product exists
     const product = await Product.findById(productId);
