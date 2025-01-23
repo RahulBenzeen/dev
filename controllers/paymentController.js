@@ -237,7 +237,6 @@ const initiateRefund = async (req, res, next) => {
     }
 
     const payment = await Payment.findOne({ orderId }).session(session);
-     console.log({payment})
 
     if (!payment || payment.paymentStatus !== 'completed') {
       throw new CustomError('Payment not found or is not completed for this order', 400);

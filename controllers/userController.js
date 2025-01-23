@@ -71,7 +71,6 @@ const verifyEmail = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.log({error})
     next(error);
   }
 };
@@ -144,6 +143,7 @@ const loginUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        profilePicture: user.profilePicture,
         token: generateToken(user._id, user.role),
       },
     });

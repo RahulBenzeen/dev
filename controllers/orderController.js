@@ -18,7 +18,6 @@ const createOrder = async (req, res, next) => {
     const { products, shippingAddress, paymentMethod } = req.body;
     const userId = req.user.id;
   
-     console.log('products is here ===> ', products)
     // Validate required fields
     if (!products || products.length === 0) {
       throw new CustomError("No products provided for the order", 400);
@@ -83,8 +82,6 @@ const getOrderById = async (req, res, next) => {
       .populate('user', 'name email') // Populate user details
       .populate('products.product', 'name price images'); // Populate name, price, and images from Product
 
-      console.log(order)
-
     if (!order) {
       throw new CustomError('Order not found', 404);
     }
@@ -101,7 +98,6 @@ const getOrderById = async (req, res, next) => {
 // @access  Private, Admin
 const updateOrderStatus = async (req, res, next) => {
   const { orderStatus } = req.body;
-  console.log('orderStatus is here ===> ', orderStatus)
   try {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
@@ -123,8 +119,6 @@ const updateOrderStatus = async (req, res, next) => {
 // @access  Private
 const getOrdersByUser = async (req, res, next) => {
   try {
-    console.log('Requesting orders for user:', req.user.id);
-
     // Find orders for the specified user
     const orders = await Order.find({ user: req.user.id })
       .populate({
@@ -193,15 +187,9 @@ const cancelOrder = async (req, res, next) => {
     // Initiate refund if payment was completed
     if (order.paymentStatus === 'completed') {
       req.body.orderId = orderId; // Pass orderId to `initiateRefund`
-      console.log("refund initiated")
       await initiateRefund(req, res, next); // Await refund processing
-      console.log('refund completed !')
       return; // Ensure no duplicate response is sent
     }
-
-    // // Update order status to 'cancelled' for unpaid orders
-    // order.orderStatus = 'cancelled';
-    // await order.save();
 
     res.status(200).json({
       success: true,

@@ -313,7 +313,6 @@ console.log(req.session)
 
     // Check if the user has any recently viewed products in their session
     const userRecentlyViewed = req.session.recentlyViewed?.[userId] || [];
-    console.log('User recently viewed product IDs:', userRecentlyViewed);
 
     // Ensure the session contains only valid ObjectIds
     const validIds = userRecentlyViewed.filter(id => /^[0-9a-fA-F]{24}$/.test(id));
