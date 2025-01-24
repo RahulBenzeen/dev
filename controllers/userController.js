@@ -15,25 +15,22 @@ const generateToken = (id, role) => {
 const sendVerificationEmail = async (user) => {
   // Generate a verification token
   const verificationToken = crypto.randomBytes(32).toString('hex');
-  
+
   // Save the token in the user's record
   user.verificationToken = verificationToken;
   await user.save();
 
   // Create the verification URL
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-  
+
   // Set up email transporter (using Nodemailer here as an example)
 
   const mailOptions = {
     recipient: user.email,
     subject: 'Email Verification',
-    message: `
-      Thank you for registering on our site. Please click the link below to verify your email address:
-       ${verificationUrl}
-    `
+    message: `Thank you for registering on our site. Please click the link below to verify your email address:${verificationUrl}`
   };
-    
+
   sendEmail(mailOptions);
 
 };
@@ -43,7 +40,7 @@ const sendVerificationEmail = async (user) => {
 // @route   GET /api/users/verify-email?token=<verificationToken>
 // @access  Public
 const verifyEmail = async (req, res, next) => {
-  const { token } = req.params; 
+  const { token } = req.params;
 
 
   try {
