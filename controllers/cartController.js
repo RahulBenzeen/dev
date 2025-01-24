@@ -63,7 +63,6 @@ const addItemToCart = async (req, res, next) => {
   }
 };
 
-
 // @desc    Get the current cart
 // @route   GET /api/cart
 // @access  Private
@@ -92,7 +91,6 @@ const getCart = async (req, res, next) => {
     next(error);
   }
 };
-
 
 // @desc    Update quantity of cart item
 // @route   PUT /api/cart/:itemId

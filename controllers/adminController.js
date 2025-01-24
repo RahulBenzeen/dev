@@ -87,7 +87,6 @@ const deleteProduct = async (req, res, next) => {
 // @route   GET /api/admin/users
 // @access  Private, Admin
 
-
 const getUsers = async (req, res, next) => {
   try {
     // Use aggregation to count the number of orders for each user
@@ -121,7 +120,6 @@ const getUsers = async (req, res, next) => {
     next(error);
   }
 };
-
 
 // @desc    Get all orders
 // @route   GET /api/admin/orders

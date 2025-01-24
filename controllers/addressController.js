@@ -47,7 +47,6 @@ const getAllAddresses = async (req, res, next) => {
   }
 };
 
-  
 // Update an address by ID
 const updateAddress = async (req, res, next) => {
   const { id } = req.params; // Get address ID from the route parameter
