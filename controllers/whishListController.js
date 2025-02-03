@@ -1,4 +1,4 @@
-const Wishlist = require('../models/whislist');
+const Wishlist = require('../models/Whislist');
 const Product = require('../models/Product');
 
 // Add product to wishlist
