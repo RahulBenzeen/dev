@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  node-app:
+    build: .
+    container_name: node-app
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+      - elasticsearch
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ES_HOST=http://elasticsearch:9200
+    networks:
+      - app-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.3
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

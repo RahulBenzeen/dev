@@ -3,10 +3,10 @@ const { CustomError } = require('../middlewares/errorHandler');
 const cloudinary = require('../utils/cloudanryImages/cloudnaryImageServices');
 const { Types: { ObjectId } } = require('mongoose');
 const Image = require('../models/Image')
+const {esClient, redisClient } = require('../utils/redis/redisConnection')
 
 // @desc    Get all products
-// @route   GET /api/products
-// @access  Public
+// @route   GET /api/v1/products
 // const getProducts = async (req, res, next) => {
 //   try {
 //     const page = Number(req.query.page) > 0 ? parseInt(req.query.page, 10) : 1;
@@ -16,24 +16,15 @@ const Image = require('../models/Image')
 //     // Get the optional filters from query parameters
 //     const { category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy } = req.query;
 
-//     // create a unique key based on query parameters for cahing 
-//     const cacheKey = `products:${JSON.stringify({ page, limit, category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy })}`;
-
-//      const cachedData = await redisClient.get(cacheKey);
-
-//      if (cachedData) {
-//       return res.status(200).json(JSON.parse(cachedData));
-//     }
-
 //     // Build the query object dynamically
 //     const query = {};
     
 //     if (category) {
-//       query.category = { $regex: new RegExp(category, 'i') };  // Case-insensitive regex for category
+//       query.category = { $regex: new RegExp(category, 'i') }; // Case-insensitive regex for category
 //     }
 
 //     if (subcategory) {
-//       query.subcategory = { $regex: new RegExp(subcategory, 'i') };  // Case-insensitive regex for subcategory
+//       query.subcategory = { $regex: new RegExp(subcategory, 'i') }; // Case-insensitive regex for subcategory
 //     }
 
 //     if (brand) query.brand = brand;
@@ -58,7 +49,7 @@ const Image = require('../models/Image')
 //         { brand: { $regex: search, $options: 'i' } },
 //         { category: { $regex: search, $options: 'i' } },
 //         { subcategory: { $regex: search, $options: 'i' } },
-//         { sku: { $regex: search, $options: 'i' } },  // Add SKU search
+//         { sku: { $regex: search, $options: 'i' } }, // Add SKU search
 //       ];
 //     }
 
@@ -92,110 +83,80 @@ const Image = require('../models/Image')
 //       .skip(startIndex)
 //       .limit(limit);
 
+//     const response = {
+//       success: true,
+//       totalItems: total,
+//       pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total },
+//       data: products,
+//     };
 
-//       const response = {
-//         success: true,
-//         totalItems: total,
-//         pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total },
-//         data: products,
-//       };
-
-//       await redisClient.setEx(cacheKey, 600, JSON.stringify(response));
-//       res.status(200).json(response);
+//     res.status(200).json(response);
 //   } catch (error) {
 //     console.error("Error fetching products:", error);
 //     next(error);
 //   }
 // };
 
+const indexProduct = async (product) => {
+  await esClient.index({
+    index: 'products',
+    id: product._id.toString(),
+    body: product
+  });
+};
 
 
 const getProducts = async (req, res, next) => {
   try {
-    const page = Number(req.query.page) > 0 ? parseInt(req.query.page, 10) : 1;
-    const limit = Number(req.query.limit) > 0 ? parseInt(req.query.limit, 10) : 10;
-    const startIndex = (page - 1) * limit;
-
-    // Get the optional filters from query parameters
-    const { category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy } = req.query;
-
-    // Build the query object dynamically
-    const query = {};
+    const { search, category, minPrice, maxPrice, page = 1, limit = 10, sortBy } = req.query;
     
-    if (category) {
-      query.category = { $regex: new RegExp(category, 'i') }; // Case-insensitive regex for category
+    const redisKey = `search:${search || 'all'}:${category || 'all'}:${minPrice || '0'}:${maxPrice || '999999'}:${page}:${limit}:${sortBy || 'default'}`;
+
+    // 🔹 Step 1: Check Redis Cache First
+    const cachedResults = await redisClient.get(redisKey);
+    if (cachedResults) {
+      console.log('✅ Serving from Redis Cache');
+      return res.json({ success: true, source: 'cache', data: JSON.parse(cachedResults) });
     }
 
-    if (subcategory) {
-      query.subcategory = { $regex: new RegExp(subcategory, 'i') }; // Case-insensitive regex for subcategory
-    }
+    // 🔹 Step 2: If No Cache, Use Elasticsearch
+    console.log('🔍 Searching Elasticsearch');
+    let mustQuery = [];
 
-    if (brand) query.brand = brand;
-
-    // Add price range filter
-    if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
-    }
-
-    // Add rating filter
-    if (rating && rating !== '0') {
-      query.rating = { $gte: parseFloat(rating) };
-    }
-
-    // Add free text search
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
-        { subcategory: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } }, // Add SKU search
-      ];
+      mustQuery.push({
+        multi_match: {
+          query: search,
+          fields: ['name', 'description', 'category', 'brand'],
+          fuzziness: 'AUTO',
+        }
+      });
+    }
+    
+    if (category) mustQuery.push({ match: { category } });
+    if (minPrice || maxPrice) {
+      mustQuery.push({ range: { price: { gte: minPrice || 0, lte: maxPrice || 999999 } } });
     }
 
-    // Count documents matching the query
-    const total = await Product.countDocuments(query);
-
-    // Prepare the sort object
-    let sort = {};
-    if (sortBy) {
-      switch (sortBy) {
-        case 'price_asc':
-          sort = { price: 1 };
-          break;
-        case 'price_desc':
-          sort = { price: -1 };
-          break;
-        case 'rating_desc':
-          sort = { rating: -1 };
-          break;
-        case 'newest':
-          sort = { createdAt: -1 };
-          break;
-        default:
-          sort = { _id: 1 }; // Default sort
+    const { body } = await esClient.search({
+      index: 'products',
+      body: {
+        query: { bool: { must: mustQuery } },
+        size: limit,
+        from: (page - 1) * limit,
+        sort: sortBy ? [{ [sortBy]: 'asc' }] : [],
       }
-    }
+    });
 
-    // Fetch products matching the query with pagination and sorting
-    const products = await Product.find(query)
-      .sort(sort)
-      .skip(startIndex)
-      .limit(limit);
+    const products = body.hits.hits.map(hit => hit._source);
 
-    const response = {
-      success: true,
-      totalItems: total,
-      pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total },
-      data: products,
-    };
+    // 🔹 Step 3: Cache the Results in Redis
+    await redisClient.setEx(redisKey, 600, JSON.stringify(products));
 
-    res.status(200).json(response);
+    res.json({ success: true, source: 'elasticsearch', data: products });
+
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error('❌ Error Fetching Products:', error);
     next(error);
   }
 };
@@ -247,12 +208,22 @@ const getProductById = async (req, res, next) => {
   }
 };
 
+// const createProduct = async (req, res, next) => {
+//   try {
+//     const { category, subcategory, brand } = req.body;
+//     const sku = generateSku(category, subcategory, brand);
+//     const product = await Product.create({ ...req.body, sku });
+
+//     res.status(201).json({ success: true, data: product });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const createProduct = async (req, res, next) => {
   try {
-    const { category, subcategory, brand } = req.body;
-    const sku = generateSku(category, subcategory, brand);
-    const product = await Product.create({ ...req.body, sku });
-
+    const product = await Product.create(req.body);
+    await indexProduct(product);  // Index the new product in Elasticsearch
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     next(error);

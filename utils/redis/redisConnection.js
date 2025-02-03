@@ -1,31 +1,21 @@
+const { Client } = require('@elastic/elasticsearch');
 const redis = require('redis');
 
-const redisClient = redis.createClient()
+// Load environment variables (from Docker)
+const redisHost = process.env.REDIS_HOST || 'localhost';
+const redisPort = process.env.REDIS_PORT || 6379;
+const esHost = process.env.ES_HOST || 'http://localhost:9200';
 
-redisClient.on('connect', () => {
-    console.log('Connected to Redis12345');
-})
+// Connect to Redis
+const redisClient = redis.createClient({
+  socket: { host: redisHost, port: redisPort },
+});
+redisClient.connect();
 
-redisClient.on('error', (err) => {
-    console.log(err.message);
-})
+redisClient.on('connect', () => console.log('✅ Redis Connected!'));
+redisClient.on('error', (err) => console.error('❌ Redis Error:', err));
 
-redisClient.on('ready', () => {
-    console.log('Redis is ready');
-})
+// Connect to Elasticsearch
+const esClient = new Client({ node: esHost });
 
-redisClient.on('end', () => {
-    console.log('Redis connection ended');
-})
-
-process.on('SIGINT', () => {
-    redisClient.quit();
-})
-
-redisClient.connect().then(() => {
-    console.log('Connected to Redis');
-}).catch((err) => {
-    console.log(err.message);
-})
-
-module.exports = redisClient;
+module.exports = { esClient, redisClient };

@@ -1,0 +1,22 @@
+services:
+  - name: node-app
+    type: web
+    env: docker
+    repo: https://github.com/RahulBenzeen/dev
+    plan: free
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  - name: redis
+    type: redis
+    plan: free
+    region: oregon
+
+  - name: elasticsearch
+    type: service
+    env: docker
+    dockerfilePath: ./Dockerfile.elasticsearch
+    healthCheckPath: /
+    autoDeploy: true
