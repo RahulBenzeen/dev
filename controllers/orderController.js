@@ -84,7 +84,7 @@ const getOrderById = async (req, res, next) => {
       .populate('products.product', 'name price images'); // Populate name, price, and images from Product
 
     if (!order) {
-      throw new CustomError('Order not found', 404);
+      throw new CustomError('Order not found', 200);
     }
 
     res.status(200).json({ success: true, order });
