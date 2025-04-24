@@ -91,6 +91,8 @@ const ProductSchema = new mongoose.Schema({
       return this.price;
     },
   },
+  bundle: Boolean,
+  gift:Boolean,
   createdAt: {
     type: Date,
     default: Date.now,

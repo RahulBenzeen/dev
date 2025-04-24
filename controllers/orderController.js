@@ -16,7 +16,7 @@ const getOrders = async (req, res, next) => {
 
 const createOrder = async (req, res, next) => {
   try {
-    const { products, shippingAddress, paymentMethod } = req.body;
+    const { products, shippingAddress, paymentMethod , totalPrice} = req.body;
     const userId = req.user.id;
   
     // Validate required fields
@@ -38,13 +38,12 @@ const createOrder = async (req, res, next) => {
       if (!product.quantity || product.quantity <= 0) {
         throw new CustomError(`Product at index ${index} has an invalid quantity`, 400);
       }
-      if (!product.price || product.price <= 0) {
+      if (product.isGift !== true && (!product.price || product.price <= 0)) {
         throw new CustomError(`Product at index ${index} has an invalid price`, 400);
       }
     });
 
     // Calculate total price
-    const totalPrice = products.reduce((sum, product) => sum + product.quantity * product.price, 0);
 
     // Normalize shipping address
     const normalizedAddress = {

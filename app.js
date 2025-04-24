@@ -17,7 +17,7 @@ const addressRoutes = require('./routes/addressRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const whishlistRoutes = require('./routes/wishlistRoutes');
-
+const offerRoutes = require('./routes/offerRoutes');
 
 const session = require('express-session');
 const { errorHandler } = require('./middlewares/errorHandler');
@@ -95,6 +95,7 @@ app.use('/api/address', addressRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/wishlist', whishlistRoutes);
+app.use('/api/offers', offerRoutes);
 
 // Error Handler
 app.use(errorHandler);

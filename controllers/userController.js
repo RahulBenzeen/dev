@@ -11,6 +11,9 @@ const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 };
 
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
 
 const sendVerificationEmail = async (user) => {
   // Generate a verification token
