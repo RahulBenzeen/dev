@@ -29,11 +29,18 @@ const getProducts = async (req, res, next) => {
 
     if (brand) query.brand = brand;
 
-    // Add price range filter
+    // // Add price range filter
+    // if (minPrice || maxPrice) {
+    //   query.price = {};
+    //   if (minPrice) query.price.$gte = parseFloat(minPrice);
+    //   if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    // }
+
     if (minPrice || maxPrice) {
       query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      if (minPrice && parseFloat(minPrice) > 0) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice && parseFloat(maxPrice) < 100000) query.price.$lte = parseFloat(maxPrice);
+      if (Object.keys(query.price).length === 0) delete query.price; // clean up if empty
     }
 
     // Add rating filter
@@ -96,8 +103,6 @@ const getProducts = async (req, res, next) => {
     next(error);
   }
 };
-
-
 
 // @desc    Get single product by ID
 // @route   GET /api/products/:id

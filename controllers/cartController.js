@@ -4,79 +4,68 @@ const BundleRule = require('../models/BundleOffer');
 const GiftRule = require('../models/GiftOffer');
 const { CustomError } = require('../middlewares/errorHandler');
 
-// Helper function to log cart state for debugging
-const logCartState = (cart, message = "Current cart state") => {
-  console.log(`\n${message}:`);
-  console.log(`Cart ID: ${cart._id}`);
-  console.log(`Items count: ${cart.items.length}`);
-  
-  cart.items.forEach((item, index) => {
-    const productId = item.product._id || item.product;
-    console.log(`Item ${index + 1}: ID=${item._id}, Product=${productId}, Qty=${item.quantity}, Price=${item.price}`);
-  });
-  console.log("\n");
-};
 
 const applyBundleDiscounts = async (cart) => {
-  // Make sure cart items are populated with product data
+  // Populate product if not already
   if (!cart.items[0]?.product?.bundle && cart.items.length > 0) {
     await cart.populate('items.product');
   }
-
-  logCartState(cart, "Before applying discounts");
 
   const bundleRules = await BundleRule.find({}).sort({ minQty: -1 });
   let totalDiscount = 0;
   const appliedOffers = [];
   const discountMap = {};
 
-  // Filter bundle items and calculate total bundle quantity
-  const bundleItems = cart.items.filter(item => 
+  const bundleItems = cart.items.filter(item =>
     item.product && typeof item.product === 'object' && item.product.bundle
   );
-  
+
   let bundleQty = bundleItems.reduce((sum, item) => sum + item.quantity, 0);
 
-
-  // Find the first matching rule (highest minQty that's <= bundleQty)
   const matchingRule = bundleRules.find(rule => bundleQty >= rule.minQty);
-  
+
   if (matchingRule) {
-   
     let discountPerRule = 0;
 
-    // Apply discount to each bundle item
-    for (const item of bundleItems) {
+    if (matchingRule.discountType === 'percent') {
+      for (const item of bundleItems) {
+        const product = item.product;
+        const originalPrice = product.price;
+        const finalPrice = parseFloat((originalPrice * (1 - matchingRule.discountValue / 100)).toFixed(2));
+        const itemDiscount = (originalPrice - finalPrice) * item.quantity;
 
-      const product = item.product;
-      // IMPORTANT: Always use the original product price, not the current cart item price
-      const originalPrice = product.price; // Use original price, not discounted price
-      let finalPrice = originalPrice;
+        discountPerRule += itemDiscount;
 
-
-      if (matchingRule.discountType === 'percent') {
-        finalPrice = parseFloat((originalPrice * (1 - matchingRule.discountValue / 100)).toFixed(2));
-      } else if (matchingRule.discountType === 'price') {
-        finalPrice = parseFloat((originalPrice - matchingRule.discountValue).toFixed(2));
+        discountMap[item._id.toString()] = {
+          originalPrice,
+          discountedPrice: finalPrice,
+          quantity: item.quantity,
+          discountAmount: itemDiscount,
+          rule: matchingRule
+        };
       }
 
-      const itemDiscount = (originalPrice - finalPrice) * item.quantity;
-      discountPerRule += itemDiscount;
+    } else if (matchingRule.discountType === 'price') {
+      // Flat price discount applied ONCE when minimum quantity is met
+      discountPerRule = matchingRule.discountValue;
 
-      // Store the discount information for this item
-      discountMap[item._id.toString()] = {
-        originalPrice,
-        discountedPrice: finalPrice,
-        quantity: item.quantity,
-        discountAmount: itemDiscount,
-        rule: {
-          minQty: matchingRule.minQty,
-          discountType: matchingRule.discountType,
-          discountValue: matchingRule.discountValue
-        }
-      };
-      
-     
+      // Distribute the discount evenly across bundle items
+      const totalItems = bundleItems.reduce((sum, item) => sum + item.quantity, 0);
+      for (const item of bundleItems) {
+        const product = item.product;
+        const originalPrice = product.price;
+        const itemShare = (item.quantity / totalItems) * matchingRule.discountValue;
+        const itemDiscount = itemShare;
+        const finalPrice = originalPrice; // Price remains same, discount is not per unit
+
+        discountMap[item._id.toString()] = {
+          originalPrice,
+          discountedPrice: originalPrice, // No price change per unit
+          quantity: item.quantity,
+          discountAmount: itemDiscount,
+          rule: matchingRule
+        };
+      }
     }
 
     if (discountPerRule > 0) {
@@ -88,7 +77,7 @@ const applyBundleDiscounts = async (cart) => {
         discountAmount: discountPerRule.toFixed(2),
       });
 
-      totalDiscount = discountPerRule; // Set total discount to this rule's discount
+      totalDiscount = discountPerRule;
     }
   } else {
     console.log("No matching bundle rule found");
@@ -106,53 +95,51 @@ const calculateCartTotals = async (cart, discountMap = {}) => {
   let originalTotal = 0;
   let discountedTotal = 0;
   let totalDiscount = 0;
-  
+
   cart.items.forEach((item) => {
     const product = item.product;
     const itemId = item._id.toString();
-    
-    // Always use the original product price for calculations
+
     const originalPrice = product?.price || item.price;
-    
-    // Calculate item total before discount
     const itemOriginalTotal = item.quantity * originalPrice;
     originalTotal += itemOriginalTotal;
-    
-    // Check if this item has a discount
+
     if (discountMap[itemId]) {
       const discountInfo = discountMap[itemId];
       const finalPrice = discountInfo.discountedPrice;
       const itemDiscount = discountInfo.discountAmount;
-      
+
       discountedTotal += item.quantity * finalPrice;
       totalDiscount += itemDiscount;
- 
     } else {
-      // No discount for this item
       discountedTotal += itemOriginalTotal;
-
     }
   });
 
   const giftRules = await GiftRule.find({});
   const gifts = [];
 
+  // Track added gift product IDs to avoid duplicates
+  const addedGiftProductIds = new Set();
+
   for (const rule of giftRules) {
-
-    if (discountedTotal >= rule.minCartValue ) {
-
+    if (discountedTotal >= rule.minCartValue) {
       const giftProducts = await Product.find({ _id: { $in: rule.giftProducts } });
-      console.log('gift products ==>', giftProducts)
-         
-gifts.push(
-  ...giftProducts.map((product) => ({
-    ...product.toObject(),
-    price: 0,
-    discountedPrice: 0,
-    isGift: true,
-  }))
-);
 
+      for (const product of giftProducts) {
+        const productId = product._id.toString();
+
+        if (!addedGiftProductIds.has(productId)) {
+          addedGiftProductIds.add(productId);
+
+          gifts.push({
+            ...product.toObject(),
+            price: 0,
+            discountedPrice: 0,
+            isGift: true,
+          });
+        }
+      }
     }
   }
 
@@ -163,6 +150,7 @@ gifts.push(
     gifts,
   };
 };
+
 
 // Add item to cart
 const addItemToCart = async (req, res, next) => {
@@ -337,7 +325,6 @@ const clearCart = async (req, res, next) => {
     const cart = await Cart.findOne({ user: req.user.id });
     if (!cart) throw new CustomError('Cart not found', 404);
 
-    console.log("Clearing cart");
     cart.items = [];
     await cart.save();
 
