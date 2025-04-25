@@ -15,6 +15,42 @@ const generateRefreshToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
+const refreshToken = async (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return next(new CustomError('No refresh token provided', 401));
+  }
+
+  try {
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+    // Find the user associated with the refresh token
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return next(new CustomError('User not found', 404));
+    }
+
+    // Generate new access token
+    const newAccessToken = generateToken(user._id, user.role);
+
+    // Optionally, you can issue a new refresh token as well
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken, // Optional: to send new refresh token
+      },
+    });
+  } catch (err) {
+    return next(new CustomError('Invalid or expired refresh token', 401));
+  }
+};
+
 const sendVerificationEmail = async (user) => {
   // Generate a verification token
   const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -134,7 +170,19 @@ const loginUser = async (req, res, next) => {
       id: user._id,
       email: user.email,
       role: user.role,
-    }
+    };
+
+    // ✅ Generate both access and refresh tokens
+    const accessToken = generateToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id); // Make sure to implement this too
+
+    // ✅ You can also optionally set refresh token as an HttpOnly cookie
+    // res.cookie('refreshToken', refreshToken, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === 'production',
+    //   sameSite: 'Strict',
+    //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    // });
 
     res.status(200).json({
       success: true,
@@ -144,13 +192,15 @@ const loginUser = async (req, res, next) => {
         email: user.email,
         role: user.role,
         profilePicture: user.profilePicture,
-        token: generateToken(user._id, user.role),
+        token: accessToken,
+        refreshToken, // ✅ Send the refresh token too
       },
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 // @desc    Forgot password (generate reset token)
 // @route   POST /api/users/forgot-password
@@ -370,5 +420,6 @@ module.exports = {
   getProfile,
   updateProfile,
   googleLogin,
-  verifyEmail
+  verifyEmail,
+  refreshToken
 };

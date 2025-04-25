@@ -7,7 +7,8 @@ const {
   forgotPassword,
   resetPassword,
   googleLogin,  // Import the Google Login controller
-  verifyEmail
+  verifyEmail,
+  refreshToken
 } = require('../controllers/userController');
 const { protect, verifyToken } = require('../middlewares/authMiddleware');
 
@@ -18,6 +19,7 @@ router.post('/register', registerUser);
 router.get('/verify-email/:token', verifyEmail);
 router.post('/login', loginUser);
 router.post('/google-login', googleLogin); // Add Google Login route
+router.post('/refresh-token', refreshToken);
 
 // Private routes
 router.get('/profile', protect, getProfile);

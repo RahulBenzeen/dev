@@ -16,39 +16,29 @@ const getProducts = async (req, res, next) => {
     // Get the optional filters from query parameters
     const { category, subcategory, brand, minPrice, maxPrice, rating, search, sortBy } = req.query;
 
-    // Build the query object dynamically
+    // Build the base query object dynamically
     const query = {};
-    
+
     if (category) {
       query.category = { $regex: new RegExp(category, 'i') }; // Case-insensitive regex for category
     }
 
-    if (subcategory) {
-      query.subcategory = { $regex: new RegExp(subcategory, 'i') }; // Case-insensitive regex for subcategory
-    }
-
     if (brand) query.brand = brand;
 
-    // // Add price range filter
-    // if (minPrice || maxPrice) {
-    //   query.price = {};
-    //   if (minPrice) query.price.$gte = parseFloat(minPrice);
-    //   if (maxPrice) query.price.$lte = parseFloat(maxPrice);
-    // }
-
-    if (minPrice || maxPrice) {
+    // Price filter
+    if (minPrice != null || maxPrice != null) {
       query.price = {};
-      if (minPrice && parseFloat(minPrice) > 0) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice && parseFloat(maxPrice) < 100000) query.price.$lte = parseFloat(maxPrice);
-      if (Object.keys(query.price).length === 0) delete query.price; // clean up if empty
+      if (minPrice != null) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice != null) query.price.$lte = parseFloat(maxPrice);
+      if (Object.keys(query.price).length === 0) delete query.price; // Clean if empty
     }
 
-    // Add rating filter
+    // Rating filter
     if (rating && rating !== '0') {
       query.rating = { $gte: parseFloat(rating) };
     }
 
-    // Add free text search
+    // Free text search filter
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -60,10 +50,25 @@ const getProducts = async (req, res, next) => {
       ];
     }
 
-    // Count documents matching the query
-    const total = await Product.countDocuments(query);
+    // Step 1: Try filtering by subcategory first
+    let finalQuery = { ...query };
 
-    // Prepare the sort object
+    if (subcategory) {
+      finalQuery.subcategory = { $regex: new RegExp(subcategory, 'i') };
+
+      // Count products with the given subcategory
+      const subcategoryCount = await Product.countDocuments(finalQuery);
+
+      if (subcategoryCount === 0) {
+        // If no products found in subcategory, fallback to category filter only
+        finalQuery = { ...query }; // Remove subcategory filter
+      }
+    }
+
+    // Step 2: Count documents matching the final query (after subcategory check)
+    const total = await Product.countDocuments(finalQuery);
+
+    // Prepare the sort object based on query parameters
     let sort = {};
     if (sortBy) {
       switch (sortBy) {
@@ -84,12 +89,13 @@ const getProducts = async (req, res, next) => {
       }
     }
 
-    // Fetch products matching the query with pagination and sorting
-    const products = await Product.find(query)
+    // Step 3: Fetch products matching the final query with pagination and sorting
+    const products = await Product.find(finalQuery)
       .sort(sort)
       .skip(startIndex)
       .limit(limit);
 
+    // Prepare the response
     const response = {
       success: true,
       totalItems: total,
@@ -107,7 +113,6 @@ const getProducts = async (req, res, next) => {
 // @desc    Get single product by ID
 // @route   GET /api/products/:id
 // @access  Public
-
 
 const getProductById = async (req, res, next) => {
   try {
@@ -415,7 +420,6 @@ const deleteCloudinaryImage = async (req, res, next) => {
     next(error);
   }
 };
-
 
 
 module.exports = { 

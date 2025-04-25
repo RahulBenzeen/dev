@@ -151,7 +151,6 @@ const calculateCartTotals = async (cart, discountMap = {}) => {
   };
 };
 
-
 // Add item to cart
 const addItemToCart = async (req, res, next) => {
   try {
